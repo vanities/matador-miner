@@ -4,6 +4,8 @@ A throwaway Docker setup to point an idle NVIDIA GPU (e.g. an RTX 5090) at the
 `btxchain/btx` chain and see whether it can mine a block — **without** exposing
 your real machine, wallet, or money.
 
+> **Upstream / official node:** [`github.com/btxchain/btx`](https://github.com/btxchain/btx) — pinned to release **`v0.30.1`** (the latest as of 2026-05-21). This repo builds nothing of its own; it only downloads and verifies that project's GPG-signed release.
+
 ## Read this first — what this does and does NOT prove
 
 - ✅ It proves your GPU can run BTX's MatMul proof-of-work and, *if network
@@ -20,7 +22,7 @@ you can't, the "value" was never real — but the electricity you spent was.
 ## Safety model (why this is the contained way to try it)
 
 - Runs entirely in a container; the node/miner cannot see your host filesystem.
-- Installs **only** the GPG-signed release from `github.com/btxchain/btx` (via the
+- Installs **only** the GPG-signed release from [`github.com/btxchain/btx`](https://github.com/btxchain/btx) (via the
   project's own `faststart` installer). It never downloads or runs anything from
   `btxprice.com` or a DM link — that is the actual malware vector.
 - Mines to a wallet generated **inside your mounted `./btx-data`** — *you* hold
