@@ -1,0 +1,16 @@
+services:
+  btx-miner:
+    build:
+      context: .
+      args:
+        RELEASE_TAG: v0.30.1
+    image: btx-miner:local
+    container_name: btx-miner
+    restart: "no"                  # surface failures instead of looping silently
+    gpus: all                      # requires nvidia-container-toolkit on the host
+    environment:
+      RELEASE_TAG: v0.30.1
+      BTX_MATMUL_BACKEND: cuda
+    volumes:
+      - ./btx-data:/data           # blockchain + YOUR wallet (self-custody) — back this up
+    # Intentionally NO published ports: the RPC interface stays inside the container.
