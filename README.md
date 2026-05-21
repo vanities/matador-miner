@@ -46,6 +46,9 @@ you can't, the "value" was never real — but the electricity you spent was.
 docker compose up --build
 ```
 
+Or use the **Makefile** (on the Linux box): `make up` / `down` / `logs` /
+`status` / `balance` / `backup` / `restore` — run `make help` for the full list.
+
 First run downloads + verifies the signed release and syncs the chain
 (fast-start / assumeutxo keeps this short), then prints **your** mining address
 and starts a supervised solo-mining loop.
