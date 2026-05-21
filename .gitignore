@@ -1,3 +1,7 @@
 btx-data/
 *.log
 faststart.json
+
+# wallet backups — NEVER commit (private keys live here)
+wallet-backup/
+*.dat
