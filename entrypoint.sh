@@ -118,14 +118,29 @@ log "Stopping provisioning daemon; mining loop takes over next..."
 "$CLI" -datadir="$DATADIR" stop >/dev/null 2>&1 || true
 for _ in $(seq 1 30); do "$CLI" -datadir="$DATADIR" getblockchaininfo >/dev/null 2>&1 || break; sleep 1; done
 
-# 6) Hand off to the project's GPU mining supervisor (foreground keeps the
-#    container alive; it starts + supervises its own btxd with the CUDA backend).
-log "Starting GPU mining loop (generatetoaddress via CUDA). 'docker compose down' to stop."
-exec "$SRC/contrib/mining/live-mining-loop.sh" \
+# 6) Hand off to the project's GPU mining supervisor. Run it in the background
+#    and trap SIGTERM/SIGINT so we shut btxd down GRACEFULLY (flush chainstate +
+#    shielded state) instead of letting Docker hard-kill it. A hard kill
+#    mid-write corrupts the shielded DB, which a pruned node can't rebuild.
+#    Pair this with `stop_grace_period` in docker-compose.yml so Docker waits.
+graceful_stop() {
+  log "Shutdown signal — stopping mining loop and flushing btxd cleanly..."
+  [ -n "${LOOP_PID:-}" ] && kill "$LOOP_PID" 2>/dev/null || true
+  "$CLI" -datadir="$DATADIR" stop >/dev/null 2>&1 || true
+  for _ in $(seq 1 115); do "$CLI" -datadir="$DATADIR" getblockcount >/dev/null 2>&1 || break; sleep 1; done
+  log "btxd stopped cleanly."
+  exit 0
+}
+trap graceful_stop TERM INT
+
+log "Starting GPU mining loop (generatetoaddress via CUDA). 'docker compose down' stops cleanly now."
+"$SRC/contrib/mining/live-mining-loop.sh" \
   --datadir="$DATADIR" \
   --wallet="$WALLET" \
   --address-file="$DATADIR/miner-address.txt" \
   --results-dir="$DATADIR/mining-ops" \
   --daemon="$BTXD" \
   --cli="$CLI" \
-  --should-mine-command=/bin/true
+  --should-mine-command=/bin/true &
+LOOP_PID=$!
+wait "$LOOP_PID"
