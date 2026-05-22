@@ -13,7 +13,7 @@ CLI  = $(COMPOSE) exec -T $(SVC) btx-cli -datadir=$(DATADIR)
 WCLI = $(CLI) -rpcwallet=$(WALLET)
 
 .DEFAULT_GOAL := help
-.PHONY: help up down restart logs status balance address gpu shell cli backup restore clean
+.PHONY: help up down restart logs status balance address gpu shell cli backup restore reset clean
 
 help: ## List available targets
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | \
@@ -62,6 +62,9 @@ restore: ## Restore wallet from wallet-backup/ as $(RESTORE_AS)
 	@$(COMPOSE) cp $(BACKUP) $(SVC):$(DATADIR)/restore-source.dat
 	@$(CLI) restorewallet $(RESTORE_AS) $(DATADIR)/restore-source.dat
 	@echo "Restored as '$(RESTORE_AS)'. Query it: $(COMPOSE) exec $(SVC) btx-cli -datadir=$(DATADIR) -rpcwallet=$(RESTORE_AS) getbalance"
+
+reset: ## Recover a wedged node: wipe chain/shielded state + re-fast-start, keep wallet (stays pruned)
+	bash scripts/reset-faststart.sh
 
 clean: ## Stop and DELETE all chain data + wallet (irreversible — run 'make backup' first)
 	$(COMPOSE) down
