@@ -94,6 +94,14 @@ if [ "${BTX_USE_SNAPSHOT:-1}" = "1" ] && [ ! -f "$DATADIR/.snapshot_loaded" ]; t
   log "Fast-start: downloading assumeutxo snapshot (~347MB, height 106875)..."
   if curl -fsSL -o "$DATADIR/snapshot.dat" "https://github.com/btxchain/btx/releases/download/${RELEASE_TAG}/snapshot.dat" \
      && echo "$SNAP_SHA  $DATADIR/snapshot.dat" | sha256sum -c -; then
+    # loadtxoutset rejects the snapshot unless the base block header is already
+    # in the headers chain — so wait for headers to reach the snapshot height.
+    log "Waiting for headers to reach the snapshot height (106875) before loadtxoutset..."
+    for _ in $(seq 1 150); do
+      hdrs=$("$CLI" -datadir="$DATADIR" getblockchaininfo 2>/dev/null | grep '"headers"' | tr -dc '0-9' || true)
+      [ -n "${hdrs:-}" ] && [ "${hdrs}" -ge 106875 ] 2>/dev/null && { log "headers synced ($hdrs)"; break; }
+      sleep 3
+    done
     log "Loading snapshot via loadtxoutset (jumps to ~106,875; takes a few minutes)..."
     if "$CLI" -datadir="$DATADIR" -rpcclienttimeout=0 loadtxoutset "$DATADIR/snapshot.dat"; then
       touch "$DATADIR/.snapshot_loaded"; rm -f "$DATADIR/snapshot.dat"
