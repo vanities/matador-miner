@@ -27,8 +27,8 @@ docker run --rm -v "$DATADIR_HOST":/data --entrypoint sh "$IMAGE" -c '
   echo "kept: $(ls -1 | tr "\n" " ")"
 '
 
-echo "==> Re-fast-starting (re-pulls ~347MB snapshot; btx.conf keeps prune=4096)..."
-docker compose up -d >/dev/null 2>&1
+echo "==> Re-fast-starting (rebuilds image so the latest entrypoint is used; re-pulls ~347MB snapshot; btx.conf keeps prune=4096)..."
+docker compose up -d --build >/dev/null 2>&1
 
 echo "==> Waiting for snapshot load + node near tip (up to ~18 min)..."
 synced=0
