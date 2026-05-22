@@ -33,8 +33,8 @@ docker compose up -d >/dev/null 2>&1
 echo "==> Waiting for snapshot load + node near tip (up to ~18 min)..."
 synced=0
 for i in $(seq 1 220); do
-  h=$(docker compose exec -T btx-miner btx-cli -datadir=/data getblockcount 2>/dev/null | tr -dc '0-9')
-  if [ -n "${h:-}" ] && [ "$h" -gt 100000 ]; then echo "node up at block $h"; synced=1; break; fi
+  h=$(docker compose exec -T btx-miner btx-cli -datadir=/data getblockcount 2>/dev/null | tr -dc '0-9' || true)
+  if [ -n "${h:-}" ] && [ "${h}" -gt 100000 ] 2>/dev/null; then echo "node up at block $h"; synced=1; break; fi
   sleep 5
 done
 
