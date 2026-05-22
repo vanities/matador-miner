@@ -5,3 +5,6 @@ faststart.json
 # wallet backups — NEVER commit (private keys live here)
 wallet-backup/
 *.dat
+
+# personal receiving address — kept out of the public repo
+address.txt
