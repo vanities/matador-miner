@@ -13,7 +13,7 @@ CLI  = $(COMPOSE) exec -T $(SVC) btx-cli -datadir=$(DATADIR)
 WCLI = $(CLI) -rpcwallet=$(WALLET)
 
 .DEFAULT_GOAL := help
-.PHONY: help up down restart logs status balance address gpu shell cli backup restore reset clean
+.PHONY: help up down restart logs stats status balance address gpu shell cli backup restore reset clean
 
 help: ## List available targets
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | \
@@ -30,6 +30,9 @@ restart: ## Stop then start the miner
 
 logs: ## Follow the miner logs
 	$(COMPOSE) logs -f
+
+stats: ## One-shot dashboard: balance + chain + mining + GPU
+	@bash scripts/stats.sh
 
 status: ## Sync + mining status (height, difficulty, chain_guard)
 	@$(CLI) getblockchaininfo | grep -E '"(blocks|headers|verificationprogress|initialblockdownload)"'
