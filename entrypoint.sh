@@ -49,8 +49,10 @@ if [ -z "$(find_bin btxd)" ]; then
 fi
 BTXD="$(find_bin btxd)"; CLI="$(find_bin btx-cli)"
 [ -n "$BTXD" ] && [ -n "$CLI" ] || { log "btxd/btx-cli not found after install."; exit 1; }
-ln -sf "$BTXD" /usr/local/bin/btxd 2>/dev/null || true
-ln -sf "$CLI"  /usr/local/bin/btx-cli 2>/dev/null || true
+# Guard against a warm `docker restart`: find_bin can return the /usr/local/bin
+# symlink itself, and re-linking it would point it at itself (ELOOP). Skip if so.
+[ "$BTXD" = /usr/local/bin/btxd ]    || ln -sf "$BTXD" /usr/local/bin/btxd 2>/dev/null || true
+[ "$CLI"  = /usr/local/bin/btx-cli ] || ln -sf "$CLI"  /usr/local/bin/btx-cli 2>/dev/null || true
 log "btxd:    $BTXD"
 log "btx-cli: $CLI"
 
@@ -63,13 +65,39 @@ if [ ! -f "$DATADIR/btx.conf" ]; then
   cat > "$DATADIR/btx.conf" <<CONF
 server=1
 listen=1
-prune=4096
+# Archival (prune=0): keep all blocks so RebuildShieldedState can never fail on a
+# pruned node — this is what caused the recurring shielded-state crash. ~119GB + ~1GB/day.
+prune=0
 dbcache=2048
 dnsseed=1
 fixedseeds=1
+# Looser chain_guard: fewer mining-pause flaps on the sparse network (small orphan-risk tradeoff).
+miningchainguardminpeers=1
+miningchainguardmaxmediangap=12
+miningminsyncedoutboundpeers=1
 addnode=node.btx.tools:19335
 addnode=146.190.179.86:19335
 addnode=164.90.246.229:19335
+addnode=38.224.253.68:19335
+addnode=167.172.147.186:19335
+addnode=167.71.191.49:19335
+addnode=5.78.219.123:19335
+addnode=206.189.253.106:19335
+addnode=143.198.155.4:19335
+addnode=24.199.117.29:19335
+addnode=5.78.69.145:19335
+addnode=3.26.207.104:19335
+addnode=143.110.151.57:19335
+addnode=134.209.226.24:19335
+addnode=54.206.106.238:19335
+addnode=3.26.17.239:19335
+addnode=42.3.112.136:19335
+addnode=86.96.19.11:19335
+addnode=101.166.40.122:19335
+addnode=101.190.74.74:19335
+addnode=101.190.6.79:19335
+addnode=1.156.47.118:19335
+addnode=124.168.58.173:19335
 CONF
 fi
 
