@@ -8,3 +8,7 @@ wallet-backup/
 
 # personal receiving address — kept out of the public repo
 address.txt
+
+# our miner: tuned CUDA profile + custom launcher (the "secret sauce") — keep local
+private/
+docker-compose.override.yml

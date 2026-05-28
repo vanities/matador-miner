@@ -1,34 +1,26 @@
 # btx-miner — isolated GPU solo-miner for `btxchain/btx`
 
-A throwaway Docker setup to point an idle NVIDIA GPU (e.g. an RTX 5090) at the
-`btxchain/btx` chain and see whether it can mine a block — **without** exposing
-your real machine, wallet, or money.
+A Docker setup to point an idle NVIDIA GPU (e.g. an RTX 5090) at the
+`btxchain/btx` chain and see whether it can mine a block while keeping the node,
+miner, and wallet data isolated from the host.
 
 > **Upstream / official node:** [`github.com/btxchain/btx`](https://github.com/btxchain/btx) — pinned to release **`v0.30.1`** (the latest as of 2026-05-21). This repo builds nothing of its own; it only downloads and verifies that project's GPG-signed release.
 
-## Read this first — what this does and does NOT prove
+## What this does
 
-- ✅ It proves your GPU can run BTX's MatMul proof-of-work and, *if network
-  difficulty is low enough*, find a block worth 20 BTX.
-- ❌ It proves **nothing** about whether those BTX are worth money. BTX is not
-  listed on any independent exchange; every dollar figure on `btxprice.com` is a
-  price the project sets for itself. Coins in your wallet are only worth what a
-  **stranger, on a venue the project does not control,** will actually pay.
-
-**The one test that settles value:** after you've mined some BTX, send ~$50
-worth to someone for real money on an exchange `btxchain` does not operate. If
-you can't, the "value" was never real — but the electricity you spent was.
+- Runs a BTX full node in Docker.
+- Downloads and verifies the upstream GPG-signed release.
+- Creates/uses a local wallet under `./btx-data`.
+- Starts a supervised GPU solo-mining loop using BTX's MatMul proof-of-work.
 
 ## Safety model (why this is the contained way to try it)
 
 - Runs entirely in a container; the node/miner cannot see your host filesystem.
 - Installs **only** the GPG-signed release from [`github.com/btxchain/btx`](https://github.com/btxchain/btx) (via the
-  project's own `faststart` installer). It never downloads or runs anything from
-  `btxprice.com` or a DM link — that is the actual malware vector.
-- Mines to a wallet generated **inside your mounted `./btx-data`** — *you* hold
-  the keys (self-custody), not the website.
-- Publishes no ports and requires **$0**. No deposit, no "activation," no "fee to
-  withdraw." If anything ever asks for that, it's a scam — stop.
+  project's own `faststart` installer).
+- Mines to a wallet generated **inside your mounted `./btx-data`** so the wallet
+  state and keys persist outside the container.
+- Publishes no ports and does not require any external wallet service.
 
 ## Prerequisites (on the Linux box with the GPU)
 
@@ -91,8 +83,6 @@ BTX_MATMUL_BACKEND=cuda /data/bin/btxd -datadir=/data -server=1 -daemon
 Exact binary paths/flags come from the upstream README and
 `doc/linux-release-builds.md`; adjust if they've changed since `v0.30.1`.
 
-## Cost
+## Power use
 
 A 5090 mining full-tilt draws ~0.5 kW → roughly **$1–2/day** in electricity.
-That is the real, guaranteed cost. Everything else is a bet on a six-week-old
-coin whose only price is quoted by the people who made it.
