@@ -86,3 +86,7 @@ Exact binary paths/flags come from the upstream README and
 ## Power use
 
 A 5090 mining full-tilt draws ~0.5 kW → roughly **$1–2/day** in electricity.
+
+## License
+
+[GNU General Public License v3.0](LICENSE)
