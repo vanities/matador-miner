@@ -18,6 +18,14 @@ WALLET=miner
 # sandboxed with no funds — do not extend trust beyond this container.
 EXPECTED_FPR="A8E17EF93249FCC3B8ACCF3D3A0454E5A6A8DC45"
 export BTX_MATMUL_BACKEND="${BTX_MATMUL_BACKEND:-cuda}"
+# How to obtain btxd/btx-cli:
+#   source  (default) — run the 0.30.2 binaries COMPILED INTO this image from the
+#                       pinned commit (see Dockerfile). No download, no GPG: the
+#                       image build is the trust boundary.
+#   release           — legacy path: download + GPG-verify the signed precompiled
+#                       release named by RELEASE_TAG. Use once upstream cuts and
+#                       signs the v0.30.2 archives (then also set RELEASE_TAG).
+BTX_INSTALL_MODE="${BTX_INSTALL_MODE:-source}"
 
 log(){ printf '\n\033[1;36m[btx-miner]\033[0m %s\n' "$*"; }
 
@@ -30,30 +38,47 @@ find_bin(){
   find "$DATADIR" /opt -maxdepth 6 -type f -name "$n" -perm -u+x 2>/dev/null | head -1
 }
 
-# 1) Import the release signing key so the installer's GPG verification passes.
-if ! gpg --list-keys "$EXPECTED_FPR" >/dev/null 2>&1; then
-  log "Importing BTX release signing key $EXPECTED_FPR (integrity check only)..."
-  curl -fsSL "https://github.com/btxchain/btx/releases/download/${RELEASE_TAG}/BTX-RELEASE-PUBKEY.asc" -o /tmp/btx-pubkey.asc
-  gpg --import /tmp/btx-pubkey.asc
-  gpg --list-keys "$EXPECTED_FPR" >/dev/null 2>&1 \
-    || { log "Imported key != expected fingerprint — aborting."; exit 1; }
+# 1-2) Resolve btxd/btx-cli for the selected install mode.
+if [ "$BTX_INSTALL_MODE" = source ]; then
+  # Binaries were compiled into the image at /opt/btx/bin (see Dockerfile).
+  BTXD=/opt/btx/bin/btxd
+  CLI=/opt/btx/bin/btx-cli
+  [ -x "$BTXD" ] && [ -x "$CLI" ] \
+    || { log "Compiled btxd/btx-cli missing from image — rebuild with 'make up'."; exit 1; }
+  # A prior release-mode run may have left precompiled binaries in the mounted
+  # volume; they would otherwise shadow these compiled ones (find_bin checks the
+  # volume first). Drop ONLY that bin dir — the chain + wallet live elsewhere
+  # under $DATADIR and are never touched.
+  if [ -d "$INSTALL_DIR" ]; then
+    log "Removing stale release binaries from volume ($INSTALL_DIR) — chain/wallet untouched."
+    rm -rf "$INSTALL_DIR"
+  fi
+else
+  # ----- legacy release path: download + GPG-verify the signed precompiled release -----
+  # 1) Import the release signing key so the installer's GPG verification passes.
+  if ! gpg --list-keys "$EXPECTED_FPR" >/dev/null 2>&1; then
+    log "Importing BTX release signing key $EXPECTED_FPR (integrity check only)..."
+    curl -fsSL "https://github.com/btxchain/btx/releases/download/${RELEASE_TAG}/BTX-RELEASE-PUBKEY.asc" -o /tmp/btx-pubkey.asc
+    gpg --import /tmp/btx-pubkey.asc
+    gpg --list-keys "$EXPECTED_FPR" >/dev/null 2>&1 \
+      || { log "Imported key != expected fingerprint — aborting."; exit 1; }
+  fi
+  # 2) Install (verify + extract) the signed CUDA-13 release. No bootstrap/daemon here.
+  if [ -z "$(find_bin btxd)" ]; then
+    log "Installing signed BTX $RELEASE_TAG ($PLATFORM) from github.com/btxchain/btx ..."
+    python3 "$SRC/contrib/faststart/btx-agent-setup.py" \
+        --repo btxchain/btx --release-tag "$RELEASE_TAG" \
+        --platform "$PLATFORM" --install-dir "$INSTALL_DIR" --force \
+      || { log "Installer failed — see the manual steps in README.md"; exit 1; }
+  fi
+  BTXD="$(find_bin btxd)"; CLI="$(find_bin btx-cli)"
+  [ -n "$BTXD" ] && [ -n "$CLI" ] || { log "btxd/btx-cli not found after install."; exit 1; }
+  # Guard against a warm `docker restart`: find_bin can return the /usr/local/bin
+  # symlink itself, and re-linking it would point it at itself (ELOOP). Skip if so.
+  [ "$BTXD" = /usr/local/bin/btxd ]    || ln -sf "$BTXD" /usr/local/bin/btxd 2>/dev/null || true
+  [ "$CLI"  = /usr/local/bin/btx-cli ] || ln -sf "$CLI"  /usr/local/bin/btx-cli 2>/dev/null || true
 fi
-
-# 2) Install (verify + extract) the signed CUDA-13 release. No bootstrap/daemon here.
-if [ -z "$(find_bin btxd)" ]; then
-  log "Installing signed BTX $RELEASE_TAG ($PLATFORM) from github.com/btxchain/btx ..."
-  python3 "$SRC/contrib/faststart/btx-agent-setup.py" \
-      --repo btxchain/btx --release-tag "$RELEASE_TAG" \
-      --platform "$PLATFORM" --install-dir "$INSTALL_DIR" --force \
-    || { log "Installer failed — see the manual steps in README.md"; exit 1; }
-fi
-BTXD="$(find_bin btxd)"; CLI="$(find_bin btx-cli)"
-[ -n "$BTXD" ] && [ -n "$CLI" ] || { log "btxd/btx-cli not found after install."; exit 1; }
-# Guard against a warm `docker restart`: find_bin can return the /usr/local/bin
-# symlink itself, and re-linking it would point it at itself (ELOOP). Skip if so.
-[ "$BTXD" = /usr/local/bin/btxd ]    || ln -sf "$BTXD" /usr/local/bin/btxd 2>/dev/null || true
-[ "$CLI"  = /usr/local/bin/btx-cli ] || ln -sf "$CLI"  /usr/local/bin/btx-cli 2>/dev/null || true
-log "btxd:    $BTXD"
+log "btxd:    $BTXD ($BTX_INSTALL_MODE)"
 log "btx-cli: $CLI"
 
 # 3) Confirm the CUDA MatMul backend is runtime-ready on this GPU.

@@ -11,7 +11,7 @@ set -euo pipefail
 LIMITS=(${LIMITS:-600 575 520 460 440 400})
 IMAGE="${IMAGE:-btx-miner:local}"
 DATADIR_HOST="${DATADIR_HOST:-$(pwd)/btx-data}"
-BENCH="${BENCH:-/data/btx-bin/btx-0.30.1/bin/btx-matmul-solve-bench}"
+BENCH="${BENCH:-/opt/btx/bin/btx-matmul-solve-bench}"   # compiled into the image (source build)
 ITERS="${ITERS:-100}"
 DEFAULT_PL="${DEFAULT_PL:-575}"
 RESTART_MINER="${RESTART_MINER:-0}"
