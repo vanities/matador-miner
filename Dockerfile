@@ -12,11 +12,15 @@
 # here ONLY because everything runs sandboxed in this container with no funds —
 # same caveat the entrypoint already documents.
 
+# Base images. An ARG consumed by a FROM must be declared in the global scope
+# BEFORE the first FROM, so BOTH live here (not next to their own stage).
+ARG CUDA_DEVEL_IMAGE=nvidia/cuda:13.0.0-devel-ubuntu24.04
+ARG CUDA_RUNTIME_IMAGE=nvidia/cuda:13.0.0-runtime-ubuntu24.04
+
 # ---------- Stage 1: compile btxd + btx-cli (+ matmul tools) with CUDA ----------
 # Compiling needs nvcc, so this stage uses the CUDA *devel* image (the runtime
 # stage below uses -runtime). Keep the CUDA major line matching the runtime base
 # and the host driver (README requires R580+ for the 5090 / CUDA 13).
-ARG CUDA_DEVEL_IMAGE=nvidia/cuda:13.0.0-devel-ubuntu24.04
 FROM ${CUDA_DEVEL_IMAGE} AS builder
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -61,8 +65,7 @@ RUN cmake -B build \
  && cmake --build build --parallel "$(nproc)" \
  && strip --strip-unneeded build/bin/btxd build/bin/btx-cli || true
 
-# ---------- Stage 2: lean CUDA runtime ----------
-ARG CUDA_RUNTIME_IMAGE=nvidia/cuda:13.0.0-runtime-ubuntu24.04
+# ---------- Stage 2: lean CUDA runtime (CUDA_RUNTIME_IMAGE declared up top) ----------
 FROM ${CUDA_RUNTIME_IMAGE}
 ENV DEBIAN_FRONTEND=noninteractive
 
