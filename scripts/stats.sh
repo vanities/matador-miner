@@ -32,12 +32,19 @@ btx-cli -datadir=/data -rpcwallet="$WALLET" listtransactions '*' 100000 0 2>/dev
 | ([.[] | select(.category=="orphan")] | length) as $orph
 | ($r | map(.blocktime) | sort) as $t
 | ($t | length) as $n
+| now as $N
 | if $n == 0 then "won       : none yet (\($orph) orphaned)"
   else
-    ($t[0]) as $f | ($t[-1]) as $l | (($l - $f)/86400) as $sp | (if $sp < 1 then 1 else $sp end) as $spd
+    ($t[0]) as $f | ($t[-1]) as $l | (($l-$f)/86400) as $sp | (if $sp<1 then 1 else $sp end) as $spd
+    | ((($N-$f)/604800)|ceil) as $wk
+    | (($f/86400)|floor) as $D0 | (($N/86400)|floor) as $D1 | (if $D1-29>$D0 then $D1-29 else $D0 end) as $S
+    | ([range($S; $D1+1)] | map(. as $dd | ([$t[]|select(.>=($dd*86400) and .<(($dd+1)*86400))]|length))) as $cc
+    | ($cc|max) as $mx
     | "won       : \($n) blocks  ·  \((($r|map(.amount)|add)*100|floor)/100) BTX  ·  \($orph) orphaned",
-      "win rate  : \((($n/$spd)*100|floor)/100)/day  \((($n/$spd*7)*10|floor)/10)/week lifetime  ·  7d=\($r|map(select(.blocktime>(now-604800)))|length)  24h=\($r|map(select(.blocktime>(now-86400)))|length)",
-      "cadence   : ~\((($sp*24/(if $n>1 then $n-1 else 1 end))*10|floor)/10)h avg gap  ·  last \($l|todate) (\((((now-$l)/3600*10)|floor)/10)h ago)"
+      "win rate  : \((($n/$spd)*100|floor)/100)/day  \((($n/$spd*7)*10|floor)/10)/week lifetime  ·  7d=\($r|map(select(.blocktime>($N-604800)))|length)  24h=\($r|map(select(.blocktime>($N-86400)))|length)",
+      "by week   : " + ([range(0; (if $wk>6 then 6 else $wk end))] | map(. as $k | ($N-($k*604800)) as $hi | ($N-(($k+1)*604800)) as $lo | ([$t[]|select(.>$lo and .<=$hi)]|length) as $c | (if $lo>$f then $lo else $f end) as $alo | (($hi-$alo)/86400) as $d | (if $k==0 then "this" else "\($k)w" end) as $lab | "\($lab) \($c)(\(if $d>0.1 then (($c/$d)*10|floor)/10 else 0 end)/d)") | join("  ·  ")) + (if $wk>6 then "  ·  +\($wk-6)w" else "" end),
+      "trend     : " + ($cc|map((if $mx>0 then (./$mx*8)|round else 0 end)|[" ","▁","▂","▃","▄","▅","▆","▇","█"][.])|join("")) + "  blocks/day (\($cc|length)d)",
+      "cadence   : ~\((($sp*24/(if $n>1 then $n-1 else 1 end))*10|floor)/10)h avg gap  ·  last \($l|todate) (\((((($N-$l)/3600)*10)|floor)/10)h ago)"
   end
 '
 SH
