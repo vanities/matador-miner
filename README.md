@@ -4,20 +4,24 @@ A Docker setup to point an idle NVIDIA GPU (e.g. an RTX 5090) at the
 `btxchain/btx` chain and see whether it can mine a block while keeping the node,
 miner, and wallet data isolated from the host.
 
-> **Upstream / official node:** [`github.com/btxchain/btx`](https://github.com/btxchain/btx) — pinned to release **`v0.30.1`** (the latest as of 2026-05-21). This repo builds nothing of its own; it only downloads and verifies that project's GPG-signed release.
+> **Upstream / official node:** [`github.com/btxchain/btx`](https://github.com/btxchain/btx). Pinned to commit [`2da3b17`](https://github.com/btxchain/btx/commit/2da3b1754d35ae157229f878a858f169a8061d28) (**0.30.2**, `main` HEAD as of 2026-06-01). Upstream bumped to 0.30.2 but has not yet cut a `v0.30.2` tag or a GPG-signed precompiled release, so this repo **compiles that exact commit from source** with the CUDA MatMul backend. When the signed v0.30.2 archives land, switch back to the precompiled path: set `BTX_INSTALL_MODE=release` + `RELEASE_TAG=v0.30.2` in `docker-compose.yml`.
 
 ## What this does
 
-- Runs a BTX full node in Docker.
-- Downloads and verifies the upstream GPG-signed release.
+- Compiles `btxd` + `btx-cli` and the CUDA MatMul backend from a pinned upstream commit (0.30.2), in the Docker build.
+- Runs that BTX full node in Docker.
 - Creates/uses a local wallet under `./btx-data`.
 - Starts a supervised GPU solo-mining loop using BTX's MatMul proof-of-work.
 
 ## Safety model (why this is the contained way to try it)
 
 - Runs entirely in a container; the node/miner cannot see your host filesystem.
-- Installs **only** the GPG-signed release from [`github.com/btxchain/btx`](https://github.com/btxchain/btx) (via the
-  project's own `faststart` installer).
+- **Source build:** compiles a single, pinned, immutable commit from
+  [`github.com/btxchain/btx`](https://github.com/btxchain/btx). This trades the
+  GPG signature of a precompiled release for commit pinning. It is acceptable
+  **only** because everything runs sandboxed here with no funds at stake; do not
+  extend trust beyond this container. Set `BTX_INSTALL_MODE=release` to go back
+  to running only the GPG-signed release once 0.30.2 is signed.
 - Mines to a wallet generated **inside your mounted `./btx-data`** so the wallet
   state and keys persist outside the container.
 - Publishes no ports and does not require any external wallet service.
@@ -41,9 +45,12 @@ docker compose up --build
 Or use the **Makefile** (on the Linux box): `make up` / `down` / `logs` /
 `status` / `balance` / `backup` / `restore` — run `make help` for the full list.
 
-First run downloads + verifies the signed release and syncs the chain
-(fast-start / assumeutxo keeps this short), then prints **your** mining address
-and starts a supervised solo-mining loop.
+First build **compiles btxd + the CUDA backend from source** (a one-time
+~20-40 min step; the NVIDIA CUDA toolchain it needs is pulled into the Docker
+build, not your host). After that it syncs the chain (fast-start / assumeutxo
+keeps this short), prints **your** mining address, and starts a supervised
+solo-mining loop. Rebuilds reuse Docker's layer cache, so nothing recompiles
+unless you change `BTX_SOURCE_REF`.
 
 ## Monitor
 
@@ -64,24 +71,24 @@ rm -rf ./btx-data          # delete chain data + wallet (back it up first if you
 
 ## Manual fallback (if the automated path hiccups)
 
-The image is just the project's own tooling, so you can run the documented steps
-by hand:
+The compiled binaries live at `/opt/btx/bin` (already on `PATH` in the image),
+so you can drive them by hand:
 
 ```bash
 docker compose run --rm --entrypoint bash btx-miner
 # inside the container:
-python3 /opt/btx-src/contrib/faststart/btx-agent-setup.py \
-  --repo btxchain/btx --release-tag v0.30.1 --preset miner --datadir=/data
-BTX_MATMUL_BACKEND=cuda /data/bin/btxd -datadir=/data -server=1 -daemon
-/data/bin/btx-cli -datadir=/data createwallet miner
-/data/bin/btx-cli -datadir=/data -rpcwallet=miner getnewaddress
+BTX_MATMUL_BACKEND=cuda btxd -datadir=/data -server=1 -daemon
+btx-cli -datadir=/data createwallet miner
+btx-cli -datadir=/data -rpcwallet=miner getnewaddress
 /opt/btx-src/contrib/mining/start-live-mining.sh \
   --datadir=/data --wallet=miner \
   --address-file=/data/miner-address.txt --should-mine-command=/bin/true
 ```
 
-Exact binary paths/flags come from the upstream README and
-`doc/linux-release-builds.md`; adjust if they've changed since `v0.30.1`.
+To build a different commit, change `BTX_SOURCE_REF` in `docker-compose.yml`.
+To switch back to the signed precompiled release once 0.30.2 is tagged + signed,
+set `BTX_INSTALL_MODE=release` and `RELEASE_TAG=v0.30.2`; the entrypoint then
+runs the upstream `faststart` installer (see `doc/linux-release-builds.md`).
 
 ## Power use
 

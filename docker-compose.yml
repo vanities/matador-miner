@@ -3,14 +3,19 @@ services:
     build:
       context: .
       args:
-        RELEASE_TAG: v0.30.1
+        # 0.30.2 compiled from source (no signed v0.30.2 release exists yet).
+        BTX_SOURCE_REF: 2da3b1754d35ae157229f878a858f169a8061d28
+        BTX_CUDA_ARCHITECTURES: "120"   # sm_120 = RTX 5090 (Blackwell)
     image: btx-miner:local
     container_name: btx-miner
     restart: unless-stopped         # keep the miner up across daemon/host hiccups
     stop_grace_period: 120s        # give btxd time to flush cleanly on stop (entrypoint traps SIGTERM)
     gpus: all                      # requires nvidia-container-toolkit on the host
     environment:
-      RELEASE_TAG: v0.30.1
+      # source  = run the 0.30.2 binaries compiled into the image (default).
+      # release = download + GPG-verify a signed precompiled release; for that,
+      #           also set RELEASE_TAG=v0.30.2 here once upstream signs it.
+      BTX_INSTALL_MODE: source
       BTX_MATMUL_BACKEND: cuda
     volumes:
       - ./btx-data:/data           # blockchain + YOUR wallet (self-custody) — back this up
