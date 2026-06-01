@@ -21,6 +21,28 @@ q getmininginfo 2>/dev/null | jq -r '"difficulty: \(.difficulty)\nnet h/s   : \(
 EOF
 fi
 
+if [ -n "${status:-}" ]; then
+  cyan "REWARDS"
+  # Win rate from the wallet's coinbase txns. Quoted heredoc (<<'SH') so jq's
+  # $r/$n/now/\(...) pass through untouched; WALLET goes in via -e and is
+  # expanded by the container shell, not the outer one.
+  docker exec -i -e WALLET="$WALLET" "$SVC" sh 2>/dev/null <<'SH'
+btx-cli -datadir=/data -rpcwallet="$WALLET" listtransactions '*' 100000 0 2>/dev/null | jq -r '
+[.[] | select(.category=="generate" or .category=="immature")] as $r
+| ([.[] | select(.category=="orphan")] | length) as $orph
+| ($r | map(.blocktime) | sort) as $t
+| ($t | length) as $n
+| if $n == 0 then "won       : none yet (\($orph) orphaned)"
+  else
+    ($t[0]) as $f | ($t[-1]) as $l | (($l - $f)/86400) as $sp | (if $sp < 1 then 1 else $sp end) as $spd
+    | "won       : \($n) blocks  ·  \((($r|map(.amount)|add)*100|floor)/100) BTX  ·  \($orph) orphaned",
+      "win rate  : \((($n/$spd)*100|floor)/100)/day  \((($n/$spd*7)*10|floor)/10)/week lifetime  ·  7d=\($r|map(select(.blocktime>(now-604800)))|length)  24h=\($r|map(select(.blocktime>(now-86400)))|length)",
+      "cadence   : ~\((($sp*24/(if $n>1 then $n-1 else 1 end))*10|floor)/10)h avg gap  ·  last \($l|todate) (\((((now-$l)/3600*10)|floor)/10)h ago)"
+  end
+'
+SH
+fi
+
 cyan "GPU"
 nvidia-smi --query-gpu=utilization.gpu,utilization.memory,clocks.current.sm,clocks.max.sm,power.draw,power.limit,temperature.gpu --format=csv,noheader 2>/dev/null \
   | awk -F', *' '{printf "util %s | mem %s | clk %s/%s | pwr %s/%s | %s\n",$1,$2,$3,$4,$5,$6,$7}'
