@@ -46,7 +46,9 @@ RUN git init -q \
  && git checkout -q FETCH_HEAD
 
 # Configure with the CUDA MatMul backend (see upstream doc/build-unix.md):
-#   - node + cli + wallet(sqlite) only; no GUI/tests/bench/tx/util/bdb/zmq.
+#   - node + cli + wallet(sqlite). BUILD_UTIL=ON only because the btx-matmul-*
+#     diagnostic + solve-bench tools are gated behind it in src/CMakeLists.txt.
+#     No GUI/tests/bench/tx/bdb/zmq.
 #   - CUDA runtime STATICALLY linked, matching the official cuda13 archives, so
 #     the runtime image needs no CUDA libs — only the host NVIDIA driver (which
 #     nvidia-container-toolkit injects at run time).
@@ -59,7 +61,7 @@ RUN cmake -B build \
       -DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc \
       -DBUILD_DAEMON=ON -DBUILD_CLI=ON -DENABLE_WALLET=ON -DWITH_SQLITE=ON \
       -DBUILD_GUI=OFF -DBUILD_TESTS=OFF -DBUILD_BENCH=OFF -DBUILD_TX=OFF \
-      -DBUILD_UTIL=OFF -DBUILD_WALLET_TOOL=OFF -DBUILD_UTIL_CHAINSTATE=OFF \
+      -DBUILD_UTIL=ON -DBUILD_WALLET_TOOL=OFF -DBUILD_UTIL_CHAINSTATE=OFF \
       -DWITH_BDB=OFF -DWITH_ZMQ=OFF -DWITH_USDT=OFF -DINSTALL_MAN=OFF \
       -DWITH_CCACHE=OFF \
  && cmake --build build --parallel "$(nproc)" \
@@ -76,7 +78,8 @@ ENV DEBIAN_FRONTEND=noninteractive
 # Ubuntu release changes.
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates curl jq python3 gnupg \
-      libevent-2.1-7t64 libsqlite3-0 libgomp1 \
+      libevent-2.1-7t64 libevent-core-2.1-7t64 libevent-extra-2.1-7t64 libevent-pthreads-2.1-7t64 \
+      libsqlite3-0 libgomp1 \
       libboost-system1.83.0 libboost-filesystem1.83.0 libboost-program-options1.83.0 \
  && rm -rf /var/lib/apt/lists/*
 
