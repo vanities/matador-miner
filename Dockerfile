@@ -1,16 +1,19 @@
 # Isolated BTX GPU solo-miner — COMPILES btxchain/btx from source.
 #
-# Upstream bumped to 0.30.2 (2026-06-01) but has NOT yet cut a v0.30.2 tag or a
-# GPG-signed precompiled release (no GitHub Actions builds them). So to run
-# 0.30.2 now we compile it ourselves, WITH the CUDA MatMul backend, from a
-# pinned upstream commit. When the signed v0.30.2 archives land, switch back to
-# the precompiled path: set BTX_INSTALL_MODE=release + RELEASE_TAG=v0.30.2 in
-# docker-compose.yml (the entrypoint keeps that path intact).
+# Pinned to the v0.31.0 tag commit, compiled WITH the CUDA MatMul backend.
+# Upstream now ships a GPG-signed cuda13 prebuilt for 0.31.0, but we compile by
+# choice: it guarantees native sm_120 codegen for the RTX 5090 (the prebuilt's
+# embedded archs are unverified) and yields a byte-reproducible build from an
+# immutable SHA. To run the signed prebuilt instead, set BTX_INSTALL_MODE=release
+# + RELEASE_TAG=v0.31.0 in docker-compose.yml (the entrypoint keeps that path).
 #
-# Trust boundary note: the old design ran ONLY the GPG-signed release. A source
-# build trades that signature for a pinned, immutable commit SHA. Acceptable
-# here ONLY because everything runs sandboxed in this container with no funds —
-# same caveat the entrypoint already documents.
+# 0.31.0 carries a MANDATORY network upgrade that activates at block 123,000;
+# nodes on older versions fork off the network after that height.
+#
+# Trust boundary note: the release signing key is integrity-only (self-published
+# with the release, nobody independent vouches — see entrypoint.sh), so a pinned
+# commit SHA is comparable trust. Acceptable here ONLY because everything runs
+# sandboxed in this container with no funds — same caveat the entrypoint documents.
 
 # Base images. An ARG consumed by a FROM must be declared in the global scope
 # BEFORE the first FROM, so BOTH live here (not next to their own stage).
@@ -24,10 +27,9 @@ ARG CUDA_RUNTIME_IMAGE=nvidia/cuda:13.0.0-runtime-ubuntu24.04
 FROM ${CUDA_DEVEL_IMAGE} AS builder
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Exact upstream commit to compile. 0.30.2 = main HEAD as of 2026-06-01T21:37Z
-# (CLIENT_VERSION_BUILD=2); no v0.30.2 tag/signed release exists yet. An
+# Exact upstream commit to compile. 90563da = the v0.31.0 release tag commit. An
 # immutable SHA means every rebuild on every box produces a byte-identical tree.
-ARG BTX_SOURCE_REF=2da3b1754d35ae157229f878a858f169a8061d28
+ARG BTX_SOURCE_REF=90563da17a8dfadd184f664329a016529ce61ee1
 # sm_120 = NVIDIA Blackwell (RTX 5090). Other GPUs: Ada=89, Hopper=90, Ampere=80/86.
 ARG BTX_CUDA_ARCHITECTURES=120
 
@@ -83,7 +85,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       libboost-system1.83.0 libboost-filesystem1.83.0 libboost-program-options1.83.0 \
  && rm -rf /var/lib/apt/lists/*
 
-# Compiled 0.30.2 binaries (btxd, btx-cli, btx-matmul-*) + the contrib/ scripts
+# Compiled 0.31.0 binaries (btxd, btx-cli, btx-matmul-*) + the contrib/ scripts
 # the entrypoint drives at run time (mining loop; faststart for release mode).
 COPY --from=builder /opt/btx-src/build/bin/ /opt/btx/bin/
 COPY --from=builder /opt/btx-src/contrib/   /opt/btx-src/contrib/
