@@ -4,11 +4,11 @@ A Docker setup to point an idle NVIDIA GPU (e.g. an RTX 5090) at the
 `btxchain/btx` chain and see whether it can mine a block while keeping the node,
 miner, and wallet data isolated from the host.
 
-> **Upstream / official node:** [`github.com/btxchain/btx`](https://github.com/btxchain/btx). Pinned to commit [`2da3b17`](https://github.com/btxchain/btx/commit/2da3b1754d35ae157229f878a858f169a8061d28) (**0.30.2**, `main` HEAD as of 2026-06-01). Upstream bumped to 0.30.2 but has not yet cut a `v0.30.2` tag or a GPG-signed precompiled release, so this repo **compiles that exact commit from source** with the CUDA MatMul backend. When the signed v0.30.2 archives land, switch back to the precompiled path: set `BTX_INSTALL_MODE=release` + `RELEASE_TAG=v0.30.2` in `docker-compose.yml`.
+> **Upstream / official node:** [`github.com/btxchain/btx`](https://github.com/btxchain/btx). Pinned to the **v0.31.0** tag commit [`90563da`](https://github.com/btxchain/btx/commit/90563da17a8dfadd184f664329a016529ce61ee1). Upstream now ships a GPG-signed `cuda13` prebuilt, but this repo **compiles that exact commit from source** with the CUDA MatMul backend by choice — it guarantees native `sm_120` codegen for the 5090 and a byte-reproducible build (the release signing key is integrity-only, so commit-pinning is comparable trust). To run the signed prebuilt instead, set `BTX_INSTALL_MODE=release` + `RELEASE_TAG=v0.31.0` in `docker-compose.yml`. **0.31.0 carries a mandatory network upgrade at block 123,000 — older versions fork off the network after that height.**
 
 ## What this does
 
-- Compiles `btxd` + `btx-cli` and the CUDA MatMul backend from a pinned upstream commit (0.30.2), in the Docker build.
+- Compiles `btxd` + `btx-cli` and the CUDA MatMul backend from a pinned upstream commit (0.31.0), in the Docker build.
 - Runs that BTX full node in Docker.
 - Creates/uses a local wallet under `./btx-data`.
 - Starts a supervised GPU solo-mining loop using BTX's MatMul proof-of-work.
@@ -17,11 +17,12 @@ miner, and wallet data isolated from the host.
 
 - Runs entirely in a container; the node/miner cannot see your host filesystem.
 - **Source build:** compiles a single, pinned, immutable commit from
-  [`github.com/btxchain/btx`](https://github.com/btxchain/btx). This trades the
-  GPG signature of a precompiled release for commit pinning. It is acceptable
-  **only** because everything runs sandboxed here with no funds at stake; do not
-  extend trust beyond this container. Set `BTX_INSTALL_MODE=release` to go back
-  to running only the GPG-signed release once 0.30.2 is signed.
+  [`github.com/btxchain/btx`](https://github.com/btxchain/btx). The signed
+  release key is integrity-only (self-published, no independent vouching), so
+  commit pinning is comparable trust — and a native `sm_120` compile is better
+  for the 5090. Acceptable **only** because everything runs sandboxed here with
+  no funds at stake; do not extend trust beyond this container. Set
+  `BTX_INSTALL_MODE=release` to run the signed prebuilt instead.
 - Mines to a wallet generated **inside your mounted `./btx-data`** so the wallet
   state and keys persist outside the container.
 - Publishes no ports and does not require any external wallet service.
@@ -86,9 +87,9 @@ btx-cli -datadir=/data -rpcwallet=miner getnewaddress
 ```
 
 To build a different commit, change `BTX_SOURCE_REF` in `docker-compose.yml`.
-To switch back to the signed precompiled release once 0.30.2 is tagged + signed,
-set `BTX_INSTALL_MODE=release` and `RELEASE_TAG=v0.30.2`; the entrypoint then
-runs the upstream `faststart` installer (see `doc/linux-release-builds.md`).
+To run the signed precompiled release instead, set `BTX_INSTALL_MODE=release`
+and `RELEASE_TAG=v0.31.0`; the entrypoint then runs the upstream `faststart`
+installer (see `doc/linux-release-builds.md`).
 
 ## Power use
 
