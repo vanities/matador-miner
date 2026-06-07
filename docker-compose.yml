@@ -3,12 +3,12 @@ services:
     build:
       context: .
       args:
-        # 0.32.1 compiled from source. Signed cuda13 prebuilts now exist, but we
+        # 0.32.2 compiled from source. Signed cuda13 prebuilts now exist, but we
         # compile by choice: it guarantees native sm_120 codegen for the 5090
         # (the prebuilt's embedded archs are unverified) and yields a
-        # byte-reproducible build from a pinned tag commit. 0.32.1 activates the
-        # MANDATORY block-125,000 network upgrade — must run >=0.32.1 before then.
-        BTX_SOURCE_REF: fad9c61c100741d98410f27444018dfdd7508385
+        # byte-reproducible build from a pinned tag commit. 0.32.2 activates the
+        # MANDATORY block-125,000 network upgrade — must run >=0.32.2 before then.
+        BTX_SOURCE_REF: 341781da970b99723e60c88580774a10167ff77e
         BTX_CUDA_ARCHITECTURES: "120"   # sm_120 = RTX 5090 (Blackwell)
     image: btx-miner:local
     container_name: btx-miner
@@ -16,9 +16,9 @@ services:
     stop_grace_period: 120s        # give btxd time to flush cleanly on stop (entrypoint traps SIGTERM)
     gpus: all                      # requires nvidia-container-toolkit on the host
     environment:
-      # source  = run the 0.32.1 binaries compiled into the image (default).
+      # source  = run the 0.32.2 binaries compiled into the image (default).
       # release = download + GPG-verify the signed precompiled release instead;
-      #           for that, also set RELEASE_TAG=v0.32.1 here.
+      #           for that, also set RELEASE_TAG=v0.32.2 here.
       BTX_INSTALL_MODE: source
       BTX_MATMUL_BACKEND: cuda
     volumes:

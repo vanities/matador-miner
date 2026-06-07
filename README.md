@@ -4,11 +4,11 @@ A Docker setup to point an idle NVIDIA GPU (e.g. an RTX 5090) at the
 `btxchain/btx` chain and see whether it can mine a block while keeping the node,
 miner, and wallet data isolated from the host.
 
-> **Upstream / official node:** [`github.com/btxchain/btx`](https://github.com/btxchain/btx). Pinned to the **v0.32.1** tag commit [`fad9c61`](https://github.com/btxchain/btx/commit/fad9c61c100741d98410f27444018dfdd7508385). Upstream now ships a GPG-signed `cuda13` prebuilt, but this repo **compiles that exact commit from source** with the CUDA MatMul backend by choice — it guarantees native `sm_120` codegen for the 5090 and a byte-reproducible build (the release signing key is integrity-only, so commit-pinning is comparable trust). To run the signed prebuilt instead, set `BTX_INSTALL_MODE=release` + `RELEASE_TAG=v0.32.1` in `docker-compose.yml`. **0.32.1 carries a mandatory network upgrade at block 125,000 (shielded sunset + MatMul nonce-seed v2) — older versions fork off the network after that height.**
+> **Upstream / official node:** [`github.com/btxchain/btx`](https://github.com/btxchain/btx). Pinned to the **v0.32.2** tag commit [`341781d`](https://github.com/btxchain/btx/commit/341781da970b99723e60c88580774a10167ff77e). Upstream now ships a GPG-signed `cuda13` prebuilt, but this repo **compiles that exact commit from source** with the CUDA MatMul backend by choice — it guarantees native `sm_120` codegen for the 5090 and a byte-reproducible build (the release signing key is integrity-only, so commit-pinning is comparable trust). To run the signed prebuilt instead, set `BTX_INSTALL_MODE=release` + `RELEASE_TAG=v0.32.2` in `docker-compose.yml`. **0.32.2 carries a mandatory network upgrade at block 125,000 (shielded sunset + MatMul nonce-seed v2) — older versions fork off the network after that height.**
 
 ## What this does
 
-- Compiles `btxd` + `btx-cli` and the CUDA MatMul backend from a pinned upstream commit (0.32.1), in the Docker build.
+- Compiles `btxd` + `btx-cli` and the CUDA MatMul backend from a pinned upstream commit (0.32.2), in the Docker build.
 - Runs that BTX full node in Docker.
 - Creates/uses a local wallet under `./btx-data`.
 - Starts a supervised GPU solo-mining loop using BTX's MatMul proof-of-work.
@@ -88,7 +88,7 @@ btx-cli -datadir=/data -rpcwallet=miner getnewaddress
 
 To build a different commit, change `BTX_SOURCE_REF` in `docker-compose.yml`.
 To run the signed precompiled release instead, set `BTX_INSTALL_MODE=release`
-and `RELEASE_TAG=v0.32.1`; the entrypoint then runs the upstream `faststart`
+and `RELEASE_TAG=v0.32.2`; the entrypoint then runs the upstream `faststart`
 installer (see `doc/linux-release-builds.md`).
 
 ## Power use

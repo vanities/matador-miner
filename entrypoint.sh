@@ -6,7 +6,7 @@
 set -euo pipefail
 
 DATADIR=/data
-RELEASE_TAG="${RELEASE_TAG:-v0.32.1}"
+RELEASE_TAG="${RELEASE_TAG:-v0.32.2}"
 PLATFORM="${BTX_PLATFORM:-linux-x86_64-cuda13}"
 INSTALL_DIR="$DATADIR/btx-bin"
 SRC=/opt/btx-src
@@ -19,11 +19,11 @@ WALLET=miner
 EXPECTED_FPR="A8E17EF93249FCC3B8ACCF3D3A0454E5A6A8DC45"
 export BTX_MATMUL_BACKEND="${BTX_MATMUL_BACKEND:-cuda}"
 # How to obtain btxd/btx-cli:
-#   source  (default) — run the 0.32.1 binaries COMPILED INTO this image from the
+#   source  (default) — run the 0.32.2 binaries COMPILED INTO this image from the
 #                       pinned tag commit (see Dockerfile). No download, no GPG:
 #                       the image build is the trust boundary.
 #   release           — alt path: download + GPG-verify the signed precompiled
-#                       release named by RELEASE_TAG (set RELEASE_TAG=v0.32.1).
+#                       release named by RELEASE_TAG (set RELEASE_TAG=v0.32.2).
 BTX_INSTALL_MODE="${BTX_INSTALL_MODE:-source}"
 
 log(){ printf '\n\033[1;36m[btx-miner]\033[0m %s\n' "$*"; }
@@ -145,7 +145,7 @@ log "Wallet keys live in ./btx-data on the host — back it up; nobody else hold
 
 # 5b) Fast-start: load the assumeutxo snapshot (height ~123,225) to skip the
 #     multi-hour genesis sync. Non-fatal — falls back to normal sync on failure.
-#     SHA + height track the v0.32.1 release snapshot; the 0.32.1 binary's baked-in
+#     SHA + height track the v0.32.2 release snapshot; the 0.32.2 binary's baked-in
 #     assumeutxo hash matches THIS height, so older snapshots would be rejected.
 SNAP_SHA="0ecc70ad6b38dc6469955b754abd255e69c6c97b78d5152e71d3c04167dec63c"
 if [ "${BTX_USE_SNAPSHOT:-1}" = "1" ] && [ ! -f "$DATADIR/.snapshot_loaded" ]; then
