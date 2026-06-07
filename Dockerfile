@@ -1,13 +1,13 @@
 # Isolated BTX GPU solo-miner — COMPILES btxchain/btx from source.
 #
-# Pinned to the v0.32.1 tag commit, compiled WITH the CUDA MatMul backend.
-# Upstream now ships a GPG-signed cuda13 prebuilt for 0.32.1, but we compile by
+# Pinned to the v0.32.2 tag commit, compiled WITH the CUDA MatMul backend.
+# Upstream now ships a GPG-signed cuda13 prebuilt for 0.32.2, but we compile by
 # choice: it guarantees native sm_120 codegen for the RTX 5090 (the prebuilt's
 # embedded archs are unverified) and yields a byte-reproducible build from an
 # immutable SHA. To run the signed prebuilt instead, set BTX_INSTALL_MODE=release
-# + RELEASE_TAG=v0.32.1 in docker-compose.yml (the entrypoint keeps that path).
+# + RELEASE_TAG=v0.32.2 in docker-compose.yml (the entrypoint keeps that path).
 #
-# 0.32.1 carries a MANDATORY network upgrade that activates at block 125,000
+# 0.32.2 carries a MANDATORY network upgrade that activates at block 125,000
 # (shielded sunset + MatMul nonce-seed v2); nodes on older versions fork off
 # the network after that height.
 #
@@ -28,9 +28,9 @@ ARG CUDA_RUNTIME_IMAGE=nvidia/cuda:13.0.0-runtime-ubuntu24.04
 FROM ${CUDA_DEVEL_IMAGE} AS builder
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Exact upstream commit to compile. fad9c61 = the v0.32.1 release tag commit. An
+# Exact upstream commit to compile. 341781d = the v0.32.2 release tag commit. An
 # immutable SHA means every rebuild on every box produces a byte-identical tree.
-ARG BTX_SOURCE_REF=fad9c61c100741d98410f27444018dfdd7508385
+ARG BTX_SOURCE_REF=341781da970b99723e60c88580774a10167ff77e
 # sm_120 = NVIDIA Blackwell (RTX 5090). Other GPUs: Ada=89, Hopper=90, Ampere=80/86.
 ARG BTX_CUDA_ARCHITECTURES=120
 
@@ -86,7 +86,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       libboost-system1.83.0 libboost-filesystem1.83.0 libboost-program-options1.83.0 \
  && rm -rf /var/lib/apt/lists/*
 
-# Compiled 0.32.1 binaries (btxd, btx-cli, btx-matmul-*) + the contrib/ scripts
+# Compiled 0.32.2 binaries (btxd, btx-cli, btx-matmul-*) + the contrib/ scripts
 # the entrypoint drives at run time (mining loop; faststart for release mode).
 COPY --from=builder /opt/btx-src/build/bin/ /opt/btx/bin/
 COPY --from=builder /opt/btx-src/contrib/   /opt/btx-src/contrib/
