@@ -6,7 +6,7 @@
 set -euo pipefail
 
 DATADIR=/data
-RELEASE_TAG="${RELEASE_TAG:-v0.31.0}"
+RELEASE_TAG="${RELEASE_TAG:-v0.32.1}"
 PLATFORM="${BTX_PLATFORM:-linux-x86_64-cuda13}"
 INSTALL_DIR="$DATADIR/btx-bin"
 SRC=/opt/btx-src
@@ -19,11 +19,11 @@ WALLET=miner
 EXPECTED_FPR="A8E17EF93249FCC3B8ACCF3D3A0454E5A6A8DC45"
 export BTX_MATMUL_BACKEND="${BTX_MATMUL_BACKEND:-cuda}"
 # How to obtain btxd/btx-cli:
-#   source  (default) — run the 0.31.0 binaries COMPILED INTO this image from the
+#   source  (default) — run the 0.32.1 binaries COMPILED INTO this image from the
 #                       pinned tag commit (see Dockerfile). No download, no GPG:
 #                       the image build is the trust boundary.
 #   release           — alt path: download + GPG-verify the signed precompiled
-#                       release named by RELEASE_TAG (set RELEASE_TAG=v0.31.0).
+#                       release named by RELEASE_TAG (set RELEASE_TAG=v0.32.1).
 BTX_INSTALL_MODE="${BTX_INSTALL_MODE:-source}"
 
 log(){ printf '\n\033[1;36m[btx-miner]\033[0m %s\n' "$*"; }
@@ -143,24 +143,24 @@ echo "$ADDR" > "$DATADIR/miner-address.txt"
 log "Mining rewards go to YOUR address: $ADDR"
 log "Wallet keys live in ./btx-data on the host — back it up; nobody else holds them."
 
-# 5b) Fast-start: load the assumeutxo snapshot (height ~120,900) to skip the
+# 5b) Fast-start: load the assumeutxo snapshot (height ~123,225) to skip the
 #     multi-hour genesis sync. Non-fatal — falls back to normal sync on failure.
-#     SHA + height track the v0.31.0 release snapshot; the 0.31.0 binary's baked-in
+#     SHA + height track the v0.32.1 release snapshot; the 0.32.1 binary's baked-in
 #     assumeutxo hash matches THIS height, so older snapshots would be rejected.
-SNAP_SHA="ee4a5b4d43883c3a4c12f05235efe67225010cc7baa2cd95c9ff81553d335528"
+SNAP_SHA="0ecc70ad6b38dc6469955b754abd255e69c6c97b78d5152e71d3c04167dec63c"
 if [ "${BTX_USE_SNAPSHOT:-1}" = "1" ] && [ ! -f "$DATADIR/.snapshot_loaded" ]; then
-  log "Fast-start: downloading assumeutxo snapshot (~440MB, height 120900)..."
+  log "Fast-start: downloading assumeutxo snapshot (~440MB, height 123225)..."
   if curl -fsSL -o "$DATADIR/snapshot.dat" "https://github.com/btxchain/btx/releases/download/${RELEASE_TAG}/snapshot.dat" \
      && echo "$SNAP_SHA  $DATADIR/snapshot.dat" | sha256sum -c -; then
     # loadtxoutset rejects the snapshot unless the base block header is already
     # in the headers chain — so wait for headers to reach the snapshot height.
-    log "Waiting for headers to reach the snapshot height (120900) before loadtxoutset..."
+    log "Waiting for headers to reach the snapshot height (123225) before loadtxoutset..."
     for _ in $(seq 1 150); do
       hdrs=$("$CLI" -datadir="$DATADIR" getblockchaininfo 2>/dev/null | grep '"headers"' | tr -dc '0-9' || true)
-      [ -n "${hdrs:-}" ] && [ "${hdrs}" -ge 120900 ] 2>/dev/null && { log "headers synced ($hdrs)"; break; }
+      [ -n "${hdrs:-}" ] && [ "${hdrs}" -ge 123225 ] 2>/dev/null && { log "headers synced ($hdrs)"; break; }
       sleep 3
     done
-    log "Loading snapshot via loadtxoutset (jumps to ~120,900; takes a few minutes)..."
+    log "Loading snapshot via loadtxoutset (jumps to ~123,225; takes a few minutes)..."
     if "$CLI" -datadir="$DATADIR" -rpcclienttimeout=0 loadtxoutset "$DATADIR/snapshot.dat"; then
       touch "$DATADIR/.snapshot_loaded"; rm -f "$DATADIR/snapshot.dat"
       log "Snapshot loaded — node is near tip."
