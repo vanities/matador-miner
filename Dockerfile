@@ -1,15 +1,16 @@
 # Isolated BTX GPU solo-miner — COMPILES btxchain/btx from source.
 #
-# Pinned to the v0.32.2 tag commit, compiled WITH the CUDA MatMul backend.
-# Upstream now ships a GPG-signed cuda13 prebuilt for 0.32.2, but we compile by
-# choice: it guarantees native sm_120 codegen for the RTX 5090 (the prebuilt's
+# Pinned to the v0.32.3 tag commit, compiled WITH the CUDA MatMul backend.
+# Upstream ships GPG-signed cuda13 prebuilts for tagged releases, but we compile
+# by choice: it guarantees native sm_120 codegen for the RTX 5090 (the prebuilt's
 # embedded archs are unverified) and yields a byte-reproducible build from an
 # immutable SHA. To run the signed prebuilt instead, set BTX_INSTALL_MODE=release
-# + RELEASE_TAG=v0.32.2 in docker-compose.yml (the entrypoint keeps that path).
+# + RELEASE_TAG=v0.32.3 in docker-compose.yml (the entrypoint keeps that path).
 #
-# 0.32.2 carries a MANDATORY network upgrade that activates at block 125,000
-# (shielded sunset + MatMul nonce-seed v2); nodes on older versions fork off
-# the network after that height.
+# 0.32.3 is a MINING-side update: the CUDA MatMul nonce-seed v2 solver gains a
+# full on-GPU pre-hash scanner (~2.47M nonces/s vs ~14k batch-of-1), plus a
+# shielded-state recovery fix. NOT a consensus change. The mandatory upgrade was
+# 0.32.2 (block-125,000 shielded sunset + nonce-seed v2), activated 2026-06-08.
 #
 # Trust boundary note: the release signing key is integrity-only (self-published
 # with the release, nobody independent vouches — see entrypoint.sh), so a pinned
@@ -28,9 +29,9 @@ ARG CUDA_RUNTIME_IMAGE=nvidia/cuda:13.0.0-runtime-ubuntu24.04
 FROM ${CUDA_DEVEL_IMAGE} AS builder
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Exact upstream commit to compile. 341781d = the v0.32.2 release tag commit. An
+# Exact upstream commit to compile. 898b170 = the v0.32.3 release tag commit. An
 # immutable SHA means every rebuild on every box produces a byte-identical tree.
-ARG BTX_SOURCE_REF=341781da970b99723e60c88580774a10167ff77e
+ARG BTX_SOURCE_REF=898b170930b2de4690521d3616a87c4ed4bb0f4b
 # sm_120 = NVIDIA Blackwell (RTX 5090). Other GPUs: Ada=89, Hopper=90, Ampere=80/86.
 ARG BTX_CUDA_ARCHITECTURES=120
 
@@ -86,7 +87,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       libboost-system1.83.0 libboost-filesystem1.83.0 libboost-program-options1.83.0 \
  && rm -rf /var/lib/apt/lists/*
 
-# Compiled 0.32.2 binaries (btxd, btx-cli, btx-matmul-*) + the contrib/ scripts
+# Compiled 0.32.3 binaries (btxd, btx-cli, btx-matmul-*) + the contrib/ scripts
 # the entrypoint drives at run time (mining loop; faststart for release mode).
 COPY --from=builder /opt/btx-src/build/bin/ /opt/btx/bin/
 COPY --from=builder /opt/btx-src/contrib/   /opt/btx-src/contrib/
