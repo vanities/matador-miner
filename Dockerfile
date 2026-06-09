@@ -49,6 +49,20 @@ RUN git init -q \
  && git fetch --depth 1 origin "${BTX_SOURCE_REF}" \
  && git checkout -q FETCH_HEAD
 
+# Local optimization patch(es) on top of the pinned upstream commit. Applied with
+# `git apply` (NOT a file-overlay) so a future BTX rev that moves this code makes
+# the build fail LOUDLY — the signal to re-derive or drop the patch.
+#   sha-windowed-scanner.patch — windowed SHA-256 (16-word sliding schedule) in the
+#   CUDA nonce-seed pre-hash scanner + matrix-gen. Byte-exact (validated 200k nonces,
+#   0 mismatches), halves the SHA local-mem stack frame; ~2x faster scanner kernel,
+#   measured +5.4% end-to-end on the RTX 5090 (the matmul digest dominates the rest).
+#   Build stock instead with --build-arg APPLY_LOCAL_PATCHES=0.
+ARG APPLY_LOCAL_PATCHES=1
+COPY patches/ /opt/btx-patches/
+RUN if [ "${APPLY_LOCAL_PATCHES}" = "1" ]; then \
+      for p in /opt/btx-patches/*.patch; do echo "applying $p"; git apply --verbose "$p"; done; \
+    else echo "APPLY_LOCAL_PATCHES=0 — building stock upstream 0.32.3"; fi
+
 # Configure with the CUDA MatMul backend (see upstream doc/build-unix.md):
 #   - node + cli + wallet(sqlite). BUILD_UTIL=ON only because the btx-matmul-*
 #     diagnostic + solve-bench tools are gated behind it in src/CMakeLists.txt.
