@@ -70,11 +70,18 @@ RUN git init -q \
 #   factored patch below doesn't cover (n % 32 != 0) and for prefix mode.
 #   factored-compression.patch — same distributivity, taken further: compress
 #   weights fold into the RHS once per request (D[j][x][m] = sum_y W[x,y] *
-#   B'[m][j*b+y]), then one warp per output word contracts A' against D. Cuts
+#   B'[m][j*b+y]), then one warp per 2x2 word tile contracts A' against D. Cuts
 #   per-candidate product MACs n^3=134M -> ~12.6M (~10.6x); kernel measured ~6.4x
 #   vs the single-reduction fused kernel. Byte-exact (validated 4096 words vs the
 #   stock fused kernel, 0 mismatches). Non-prefix mode only; adds a ~1 MiB/request
 #   device staging buffer per workspace slot.
+#   matrixgen-seed-midstate.patch — the matrix-gen SHA hashes seed||index with a
+#   fixed seed in w[0..7], so rounds 0-7 are identical across all 2^18 elements of
+#   a matrix. A tiny precompute kernel computes that midstate once per seed; the
+#   gen kernel loads it as scalars and resumes at round 8 (no per-block barrier —
+#   a shared-memory hoist was 3x SLOWER; the 2-kernel form is the win). ~12% faster
+#   matrix-gen kernel, +5.6% end-to-end in v2 mode (validated 2.1M elements, 0
+#   mismatches; ~2^-31 retry/fallback defers to the full path).
 #   Build stock instead with --build-arg APPLY_LOCAL_PATCHES=0.
 ARG APPLY_LOCAL_PATCHES=1
 COPY patches/ /opt/btx-patches/
