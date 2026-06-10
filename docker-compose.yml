@@ -27,3 +27,27 @@ services:
     volumes:
       - ./btx-data:/data           # blockchain + YOUR wallet (self-custody) — back this up
     # Intentionally NO published ports: the RPC interface stays inside the container.
+
+  # OPTIONAL pool-mining mode (minebtx / DEXBTX). Gated behind the "pool" profile
+  # so plain `docker compose up -d` (and `make up`) NEVER starts it — only
+  # `make pool` does. Solo and pool can't run at once (they'd fight over the GPU),
+  # so the make targets stop one before starting the other. Pool mode uses the
+  # pool's own btx-gbt-solve (v0.32.2-based) — SLOWER than our solo solver — and
+  # trades that for steady PPLNS payouts. See Dockerfile.pool for the trust note.
+  btx-pool:
+    profiles: ["pool"]             # opt-in: started only via `make pool`
+    build:
+      context: .
+      dockerfile: Dockerfile.pool
+    image: btx-miner-pool:local
+    container_name: btx-pool
+    restart: unless-stopped
+    gpus: all                      # contends with btx-miner — run one at a time
+    environment:
+      # Payout address is injected by `make pool` from address.txt (kept out of
+      # committed files). Unset => the entrypoint refuses to start (fail loud).
+      BTX_PAYOUT_ADDRESS: ${BTX_PAYOUT_ADDRESS:-}
+      BTX_POOL_HOST: minebtx.com
+      BTX_POOL_PORT: "3333"
+    # NO volumes: the pool client needs no wallet/chain data — payout is to a
+    # public address, so no keys are mounted into the third-party solver.

@@ -53,6 +53,26 @@ keeps this short), prints **your** mining address, and starts a supervised
 solo-mining loop. Rebuilds reuse Docker's layer cache, so nothing recompiles
 unless you change `BTX_SOURCE_REF`.
 
+### Solo vs pool
+
+By default this **solo-mines** with our patched node solver (fastest path —
+you keep 100% of every block you find). You can instead mine to the
+**[minebtx / DEXBTX pool](https://minebtx.com)** for steady payouts:
+
+```bash
+make pool     # switch to pool mining (stops solo; payout address from address.txt)
+make solo     # switch back to solo
+make pool-logs
+```
+
+Trade-off: pool mode runs the pool's own `btx-gbt-solve` (a v0.32.2-based
+binary, SHA256-verified at build), which is **slower than our solo solver** and
+takes a 2.5% fee — but it pays out steadily (weekly PPLNS) instead of solo's
+all-or-nothing block lottery. Solo and pool can't run at once (one GPU), so the
+targets stop one before starting the other. The pool client runs in its own
+container with **no wallet/chain mount** — payouts go to your public `btx1z...`
+address, no keys are exposed.
+
 ## Monitor
 
 ```bash

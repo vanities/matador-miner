@@ -13,7 +13,11 @@ CLI  = $(COMPOSE) exec -T $(SVC) btx-cli -datadir=$(DATADIR)
 WCLI = $(CLI) -rpcwallet=$(WALLET)
 
 .DEFAULT_GOAL := help
-.PHONY: help up down restart logs stats status balance address gpu bench shell cli backup restore reset clean
+.PHONY: help up down restart logs stats status balance address gpu bench pool solo pool-logs shell cli backup restore reset clean
+
+# Payout address for pool mode — pulled from address.txt (gitignored) so it
+# never lands in a committed file. The first btx1... line wins.
+POOL_ADDR = $(shell grep -m1 '^btx1' address.txt 2>/dev/null)
 
 help: ## List available targets
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | \
@@ -54,6 +58,25 @@ gpu: ## GPU utilization / power / temp (host nvidia-smi)
 
 bench: ## A/B the solver across images in v2 (live-representative) mode; pauses miner
 	@bash bench/ab.sh
+
+pool: ## Switch to POOL mining (minebtx) — stops solo. Pool's solver is SLOWER than solo; trades speed for steady payouts
+	@test -n "$(POOL_ADDR)" || { echo "No btx1... payout address in address.txt — add one first."; exit 1; }
+	@echo "Payouts will go to: $(POOL_ADDR)"
+	@echo "Stopping SOLO miner (solo and pool can't share the GPU)..."
+	@$(COMPOSE) stop $(SVC) 2>/dev/null || true
+	@echo "Building + starting POOL miner..."
+	@BTX_PAYOUT_ADDRESS=$(POOL_ADDR) $(COMPOSE) --profile pool up -d --build btx-pool
+	@echo "Pool mining. Logs: make pool-logs   ·   Back to solo: make solo"
+
+solo: ## Switch back to SOLO mining (our patched node) — stops pool
+	@echo "Stopping POOL miner..."
+	@$(COMPOSE) --profile pool stop btx-pool 2>/dev/null || true
+	@echo "Starting SOLO miner..."
+	@$(COMPOSE) up -d $(SVC)
+	@echo "Solo mining (our optimized solver)."
+
+pool-logs: ## Follow the pool miner logs
+	@$(COMPOSE) logs -f btx-pool
 
 shell: ## Open a shell inside the miner container
 	$(COMPOSE) exec $(SVC) bash

@@ -1,0 +1,51 @@
+# Optional POOL-mining mode — connects to the DEXBTX / minebtx pool instead of
+# solo-mining with our patched node. This is a SEPARATE, self-contained image:
+# it does NOT use our optimized 0.32.3+patches solver. The pool drives its own
+# closed `btx-gbt-solve` binary (built off BTX v0.32.2, CPU-gated input gen), so
+# pool mode trades our ~3x solo throughput for steady PPLNS payouts (2.5% fee,
+# weekly). Use it for variance smoothing, not for peak hashrate — solo is faster.
+#
+# We replicate https://minebtx.com/install.sh's steps with PINNED versions
+# (rather than `curl | bash`) so the build is reproducible and the closed solver
+# binary is SHA256-verified, exactly as the installer does. Bump the three pins
+# below when minebtx cuts a new release (the SHA check fails loudly otherwise).
+#
+# Trust boundary: `btx-gbt-solve` is a closed third-party binary. It runs here
+# with GPU access but NO wallet/datadir mount (see docker-compose.yml) — payouts
+# go to a PUBLIC btx1z... address, so no keys are exposed. Same sandboxed posture
+# as the solo image: acceptable because nothing with funds is reachable.
+ARG CUDA_RUNTIME_IMAGE=nvidia/cuda:12.8.0-runtime-ubuntu24.04
+FROM ${CUDA_RUNTIME_IMAGE}
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Pins mirrored from minebtx install.sh (INSTALL_SH_VERSION 0.3.14):
+#   - dexbtx-miner Python package (the stratum orchestrator)
+#   - btx-gbt-solve x86_64 CUDA solver + its pinned SHA256
+ARG DEXBTX_MINER_PKG_URL=https://github.com/dexbtx/minebtx/archive/refs/tags/v0.4.6.tar.gz
+ARG SOLVER_URL=https://github.com/dexbtx/minebtx/releases/download/btx-prebuilds-v0.32.2/btx-gbt-solve
+ARG SOLVER_SHA256=bc605267a91d9840190d9b12a67354666418b989fd56138ab4fa4d924a8481a0
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      python3 python3-pip curl ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+
+# The Python orchestrator + its yaml dep. --break-system-packages: Ubuntu 24.04
+# marks the system Python PEP-668 externally-managed; in a throwaway container we
+# own it, so a system-wide install (puts `dexbtx-miner` on PATH) is fine.
+RUN pip install --no-cache-dir --break-system-packages \
+      pyyaml "${DEXBTX_MINER_PKG_URL}"
+
+# The closed GPU solver — download, SHA256-verify against the install.sh pin,
+# then install. A mismatch aborts the build (refusing an untrusted binary).
+RUN mkdir -p /opt/dexbtx/bin \
+ && curl -fsSL "${SOLVER_URL}" -o /tmp/btx-gbt-solve \
+ && echo "${SOLVER_SHA256}  /tmp/btx-gbt-solve" | sha256sum -c - \
+ && install -m 0755 /tmp/btx-gbt-solve /opt/dexbtx/bin/btx-gbt-solve \
+ && rm -f /tmp/btx-gbt-solve \
+ && /opt/dexbtx/bin/btx-gbt-solve --help 2>&1 | grep -q "share-target" \
+      || (echo "solver lacks --share-target — wrong/old binary" && exit 1)
+
+COPY entrypoint-pool.sh /usr/local/bin/entrypoint-pool.sh
+RUN chmod +x /usr/local/bin/entrypoint-pool.sh
+
+ENTRYPOINT ["/usr/local/bin/entrypoint-pool.sh"]
