@@ -130,6 +130,33 @@ __global__ void GenKernel(const DeviceSeedBytes* seeds,size_t total,uint32_t mat
     const uint32_t batch=(uint32_t)(gid/matrix_elements); const uint32_t local=(uint32_t)(gid%matrix_elements);
     out[gid]=FromOracle<WIN>(seeds[batch],local);
 }
+
+// ---- matrixgen-seed-midstate.patch: 2-kernel form (precompute + scalar-load gen) ----
+__global__ void PrecomputeMidstatesK(const DeviceSeedBytes* seeds,uint32_t n_seeds,uint32_t* out){
+    uint32_t i=blockIdx.x*blockDim.x+threadIdx.x; if(i>=n_seeds) return;
+    uint32_t w[8]={}; for(uint32_t k=0;k<32;++k) SetShaByte(w,k,seeds[i].data[31U-k]);
+    uint32_t a=0x6a09e667U,b=0xbb67ae85U,c=0x3c6ef372U,d=0xa54ff53aU,e=0x510e527fU,f=0x9b05688cU,g=0x1f83d9abU,h=0x5be0cd19U;
+    for(uint32_t t=0;t<8;++t){ uint32_t t1=h+ShaBSig1(e)+ShaCh(e,f,g)+SHA256_K[t]+w[t]; uint32_t t2=ShaBSig0(a)+ShaMaj(a,b,c); h=g;g=f;f=e;e=d+t1;d=c;c=b;b=a;a=t1+t2; }
+    uint32_t* o=out+(size_t)i*16U;
+    o[0]=w[0];o[1]=w[1];o[2]=w[2];o[3]=w[3];o[4]=w[4];o[5]=w[5];o[6]=w[6];o[7]=w[7];
+    o[8]=a;o[9]=b;o[10]=c;o[11]=d;o[12]=e;o[13]=f;o[14]=g;o[15]=h;
+}
+__device__ inline uint32_t CandMidScalars(const uint32_t* mb,uint32_t index){
+    uint32_t w[16]; w[0]=mb[0];w[1]=mb[1];w[2]=mb[2];w[3]=mb[3];w[4]=mb[4];w[5]=mb[5];w[6]=mb[6];w[7]=mb[7];
+    for(uint32_t i=8;i<16;++i) w[i]=0U;
+    SetShaByte(w,32U,index&0xffU);SetShaByte(w,33U,(index>>8U)&0xffU);SetShaByte(w,34U,(index>>16U)&0xffU);SetShaByte(w,35U,(index>>24U)&0xffU);
+    SetShaByte(w,36U,0x80U); w[15]=36U*8U;
+    uint32_t a=mb[8],b=mb[9],c=mb[10],d=mb[11],e=mb[12],f=mb[13],g=mb[14],h=mb[15];
+    for(uint32_t t=8;t<64;++t){ uint32_t wt; if(t<16) wt=w[t]; else { wt=ShaSSig1(w[(t-2)&15U])+w[(t-7)&15U]+ShaSSig0(w[(t-15)&15U])+w[(t-16)&15U]; w[t&15U]=wt; } uint32_t t1=h+ShaBSig1(e)+ShaCh(e,f,g)+SHA256_K[t]+wt; uint32_t t2=ShaBSig0(a)+ShaMaj(a,b,c); h=g;g=f;f=e;e=d+t1;d=c;c=b;b=a;a=t1+t2; }
+    return Bswap32(0x6a09e667U+a)&MODULUS;
+}
+__global__ void GenKernelMid2(const DeviceSeedBytes* seeds,const uint32_t* midbuf,size_t total,uint32_t matrix_elements,Element* out){
+    const size_t gid=(size_t)blockIdx.x*blockDim.x+threadIdx.x; if(gid>=total) return;
+    const uint32_t batch=(uint32_t)(gid/matrix_elements); const uint32_t local=(uint32_t)(gid%matrix_elements);
+    const uint32_t* mb=midbuf+(size_t)batch*16U;
+    uint32_t cand=CandMidScalars(mb,local);
+    out[gid] = cand<MODULUS ? cand : FromOracle<true>(seeds[batch],local);
+}
 // Edge paths (never hit naturally; the patch touched them, so prove them too)
 template<bool WIN>
 __global__ void EdgeKernel(const DeviceSeedBytes* seeds,uint32_t n_seeds,uint32_t n_idx,uint32_t* out){
@@ -298,6 +325,16 @@ int main(){
     CK(cudaMemcpy(heo,d_eo,(size_t)EN*4,cudaMemcpyDeviceToHost)); CK(cudaMemcpy(hew,d_ew,(size_t)EN*4,cudaMemcpyDeviceToHost));
     mism=0; for(size_t i=0;i<EN;++i) if(heo[i]!=hew[i]) ++mism;
     printf("retry/fallback byte-exact: cases=%u mismatches=%zu -> %s\n",EN,mism,mism==0?"PASS":"FAIL");
+    if(mism) return 1;
+    // matrixgen-seed-midstate (2-kernel) vs ORIGINAL (the consensus reference)
+    Element* d_gm; CK(cudaMalloc(&d_gm,TOTAL*4));
+    uint32_t* d_mid; CK(cudaMalloc(&d_mid,(size_t)SEEDS*16*4));
+    PrecomputeMidstatesK<<<(SEEDS+255)/256,256>>>(dseeds,SEEDS,d_mid);
+    GenKernelMid2<<<gblocks,WORKSPACE_THREADS>>>(dseeds,d_mid,TOTAL,ME,d_gm);
+    CK(cudaDeviceSynchronize());
+    Element* hm=(Element*)malloc(TOTAL*4); CK(cudaMemcpy(hm,d_gm,TOTAL*4,cudaMemcpyDeviceToHost));
+    mism=0; for(size_t i=0;i<TOTAL;++i) if(ho[i]!=hm[i]) ++mism;
+    printf("matrixgen midstate byte-exact: elements=%zu mismatches=%zu -> %s\n",TOTAL,mism,mism==0?"PASS":"FAIL");
     if(mism) return 1;
 
     // ================= Part 2: fused kernel =================
