@@ -13,7 +13,7 @@ CLI  = $(COMPOSE) exec -T $(SVC) btx-cli -datadir=$(DATADIR)
 WCLI = $(CLI) -rpcwallet=$(WALLET)
 
 .DEFAULT_GOAL := help
-.PHONY: help up down restart logs stats status balance address gpu shell cli backup restore reset clean
+.PHONY: help up down restart logs stats status balance address gpu bench shell cli backup restore reset clean
 
 help: ## List available targets
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | \
@@ -34,9 +34,14 @@ logs: ## Follow the miner logs
 stats: ## One-shot dashboard: balance + chain + mining + GPU
 	@bash scripts/stats.sh
 
-status: ## Sync + mining status (height, difficulty, chain_guard)
+status: ## Sync + mining status (height, difficulty trend, live solve rate)
 	@$(CLI) getblockchaininfo | grep -E '"(blocks|headers|verificationprogress|initialblockdownload)"'
 	@$(CLI) getmininginfo   | grep -E 'difficulty|networkhashps|should_pause_mining|"reason"|near_tip'
+	@printf 'live rate : '; \
+	 N1=$$($(CLI) getmatmulchallengeprofile 2>/dev/null | jq -r '.service_profile.runtime_observability.solve_pipeline.batched_nonce_attempts // 0'); \
+	 sleep 3; \
+	 N2=$$($(CLI) getmatmulchallengeprofile 2>/dev/null | jq -r '.service_profile.runtime_observability.solve_pipeline.batched_nonce_attempts // 0'); \
+	 if [ "$$N2" -gt "$$N1" ] 2>/dev/null; then echo "$$(( (N2-N1)/3 )) nonce-attempts/s (live, vs bench which runs several x faster)"; else echo "(warming up)"; fi
 
 balance: ## Wallet balance / immature / tx count
 	@$(WCLI) getwalletinfo | grep -E '"balance"|immature|txcount'
@@ -46,6 +51,9 @@ address: ## Show the mining payout address
 
 gpu: ## GPU utilization / power / temp (host nvidia-smi)
 	@nvidia-smi --query-gpu=utilization.gpu,power.draw,temperature.gpu --format=csv,noheader
+
+bench: ## A/B the solver across images in v2 (live-representative) mode; pauses miner
+	@bash bench/ab.sh
 
 shell: ## Open a shell inside the miner container
 	$(COMPOSE) exec $(SVC) bash
