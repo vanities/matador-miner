@@ -218,6 +218,47 @@ __global__ void FusedNew(const Element* __restrict__ A,const Element* __restrict
     if(tid==0) out[oo]=partials[0];
 }
 
+// ---- factored compression: D once per request, then warp-per-word (the patched fast path) ----
+__global__ void FactoredRhs(const Element* __restrict__ B,const Element* __restrict__ comp,
+                            uint32_t n,uint32_t bs,size_t total_rhs,uint32_t re,uint32_t me,uint32_t ce,Element* __restrict__ rhs){
+    const size_t gid=(size_t)blockIdx.x*blockDim.x+threadIdx.x; if(gid>=total_rhs) return;
+    const uint32_t batch=(uint32_t)(gid/re); const uint32_t local=(uint32_t)(gid%re);
+    const uint32_t m=local%n; const uint32_t jx=local/n; const uint32_t x=jx%bs; const uint32_t j=jx/bs;
+    const Element* b_row=B+(size_t)batch*me+(size_t)m*n+j*bs;
+    const Element* w_row=comp+(size_t)batch*ce+x*bs;
+    uint64_t acc{0}; uint32_t pending{0};
+    for(uint32_t y=0;y<bs;++y){
+        acc+=(uint64_t)w_row[y]*b_row[y];
+        if(++pending==REDUCE_INTERVAL){ acc=Reduce64(acc); pending=0; }
+    }
+    rhs[gid]=Reduce64(acc);
+}
+__global__ void FactoredWords(const Element* __restrict__ A,const Element* __restrict__ rhs,
+                              uint32_t n,uint32_t bs,uint32_t bpa,uint32_t pcpr,uint32_t wpr,uint32_t me,uint32_t re,
+                              uint32_t total_pairs,Element* __restrict__ out){
+    const uint32_t lane=threadIdx.x&31U;
+    const uint32_t pair=blockIdx.x*(blockDim.x>>5U)+(threadIdx.x>>5U);
+    if(pair>=total_pairs) return;
+    const uint32_t batch=pair/pcpr; const uint32_t lp=pair%pcpr;
+    const uint32_t j=lp%bpa; const uint32_t i=lp/bpa;
+    const Element* ma=A+(size_t)batch*me; const Element* d=rhs+(size_t)batch*re;
+    uint64_t acc{0}; uint32_t pending{0};
+    for(uint32_t x=0;x<bs;++x){
+        const Element* a_row=ma+(size_t)(i*bs+x)*n;
+        const Element* d_row=d+(size_t)(j*bs+x)*n;
+        for(uint32_t m=lane;m<n;m+=32U){
+            acc+=(uint64_t)a_row[m]*d_row[m];
+            if(++pending==REDUCE_INTERVAL){ acc=Reduce64(acc); pending=0; }
+        }
+    }
+    Element value=Reduce64(acc);
+    for(uint32_t offset=16U;offset>0U;offset>>=1U){
+        const Element other=__shfl_down_sync(0xffffffffU,value,offset);
+        value=FieldAdd(value,other);
+    }
+    if(lane==0) out[batch*wpr+lp]=value;
+}
+
 static uint64_t rng_state=0x243f6a8885a308d3ULL;
 static uint32_t NextRand(){ rng_state^=rng_state<<13; rng_state^=rng_state>>7; rng_state^=rng_state<<17; return (uint32_t)(rng_state>>32); }
 
@@ -288,6 +329,21 @@ int main(){
     printf("fused vs CPU reference: pairs=64 mismatches=%zu -> %s\n",cpu_mism,cpu_mism==0?"PASS":"FAIL");
     if(cpu_mism) return 1;
 
+    // ================= Part 3: factored compression =================
+    const uint32_t RE=BS*N*BPA;                      // D words per request
+    const size_t RT=(size_t)BATCH*RE;
+    Element *d_rhs,*d_ff; CK(cudaMalloc(&d_rhs,RT*4)); CK(cudaMalloc(&d_ff,WT*4));
+    const uint32_t rhs_blocks=(uint32_t)((RT+255)/256);
+    const uint32_t warps_per_block=256/32, word_blocks=(BATCH*PCPR+warps_per_block-1)/warps_per_block;
+    FactoredRhs<<<rhs_blocks,256>>>(dB,dC,N,BS,RT,RE,ME,CE,d_rhs);
+    FactoredWords<<<word_blocks,256>>>(dA,d_rhs,N,BS,BPA,PCPR,WPR,ME,RE,BATCH*PCPR,d_ff);
+    CK(cudaDeviceSynchronize());
+    Element* hff=(Element*)malloc(WT*4);
+    CK(cudaMemcpy(hff,d_ff,WT*4,cudaMemcpyDeviceToHost));
+    mism=0; for(size_t i=0;i<WT;++i) if(hfo[i]!=hff[i]) ++mism;
+    printf("factored vs fused-orig byte-exact: words=%zu mismatches=%zu -> %s\n",WT,mism,mism==0?"PASS":"FAIL");
+    if(mism) return 1;
+
     // ================= throughput (contended w/ live miner; ratio is the signal) =================
     cudaEvent_t s,e; CK(cudaEventCreate(&s)); CK(cudaEventCreate(&e)); float ms;
     printf("\nkernel              orig(ms)    new(ms)   speedup\n");
@@ -306,6 +362,14 @@ int main(){
         CK(cudaEventRecord(s)); for(int i=0;i<FI;++i) FusedNew<<<fgrid,MAX_BLOCK_THREADS>>>(dA,dB,dC,N,BS,BPA,PCPR,WPR,ME,CE,d_fn); CK(cudaEventRecord(e)); CK(cudaEventSynchronize(e));
         CK(cudaEventElapsedTime(&ms,s,e)); const double fn=ms/FI;
         printf("fused[%d]        %10.3f %10.3f  %+7.1f%%\n",r,fo,fn,(fo/fn-1.0)*100.0);
+    }
+    for(int r=0;r<3;++r){
+        const int FI=20;
+        CK(cudaEventRecord(s)); for(int i=0;i<FI;++i) FusedNew<<<fgrid,MAX_BLOCK_THREADS>>>(dA,dB,dC,N,BS,BPA,PCPR,WPR,ME,CE,d_fn); CK(cudaEventRecord(e)); CK(cudaEventSynchronize(e));
+        CK(cudaEventElapsedTime(&ms,s,e)); const double fn=ms/FI;
+        CK(cudaEventRecord(s)); for(int i=0;i<FI;++i){ FactoredRhs<<<rhs_blocks,256>>>(dB,dC,N,BS,RT,RE,ME,CE,d_rhs); FactoredWords<<<word_blocks,256>>>(dA,d_rhs,N,BS,BPA,PCPR,WPR,ME,RE,BATCH*PCPR,d_ff); } CK(cudaEventRecord(e)); CK(cudaEventSynchronize(e));
+        CK(cudaEventElapsedTime(&ms,s,e)); const double ff=ms/FI;
+        printf("factored[%d]     %10.3f %10.3f  %+7.1f%%   (col1=fused-new, col2=factored K1+K2)\n",r,fn,ff,(fn/ff-1.0)*100.0);
     }
     printf("\nALL PASS\n");
     return 0;
