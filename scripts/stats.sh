@@ -53,7 +53,7 @@ fi
 
 cyan "GPU"
 nvidia-smi --query-gpu=utilization.gpu,utilization.memory,clocks.current.sm,clocks.max.sm,power.draw,power.limit,temperature.gpu --format=csv,noheader 2>/dev/null \
-  | awk -F', *' '{printf "util %s | mem %s | clk %s/%s | pwr %s/%s | %s\n",$1,$2,$3,$4,$5,$6,$7}'
+  | awk -F', *' '{printf "util %s | mem %s | clk %s/%s | pwr %s/%s | temp %s°C\n",$1,$2,$3,$4,$5,$6,$7}'
 # Live throughput meter: delta of the solver's cumulative nonce/digest counters
 # over a short sample. nonce attempts = nonces fed to the GPU digest; digest
 # batches = GPU kernel launches. These are the REAL live rates (the solve-bench
