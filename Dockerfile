@@ -49,13 +49,24 @@ RUN git init -q \
  && git fetch --depth 1 origin "${BTX_SOURCE_REF}" \
  && git checkout -q FETCH_HEAD
 
-# Local optimization patch(es) on top of the pinned upstream commit. Applied with
+# Local optimization patches on top of the pinned upstream commit. Applied with
 # `git apply` (NOT a file-overlay) so a future BTX rev that moves this code makes
-# the build fail LOUDLY — the signal to re-derive or drop the patch.
+# the build fail LOUDLY — the signal to re-derive or drop the patch. Each patch is
+# byte-exact-validated on-GPU before deploy (see patches/validate-*.cu).
 #   sha-windowed-scanner.patch — windowed SHA-256 (16-word sliding schedule) in the
-#   CUDA nonce-seed pre-hash scanner + matrix-gen. Byte-exact (validated 200k nonces,
-#   0 mismatches), halves the SHA local-mem stack frame; ~2x faster scanner kernel,
-#   measured +5.4% end-to-end on the RTX 5090 (the matmul digest dominates the rest).
+#   CUDA nonce-seed pre-hash scanner (oracle_accel.cu). ~2x faster scanner kernel,
+#   measured +5.4% end-to-end (validated 200k nonces, 0 mismatches).
+#   sha-windowed-matrixgen.patch — the same windowed-SHA transform applied to
+#   matmul_accel.cu's DUPLICATE of that SHA code, which runs even hotter: the
+#   per-candidate GenerateBaseMatrixFromSeedBatchKernel (2 x n^2 = 524k
+#   compressions per candidate). ~3.1x faster matrix-gen kernel (validated 2.1M
+#   elements + 65k retry/fallback edge cases, 0 mismatches).
+#   fused-single-reduction.patch — in the live PRODUCT_FINAL_BLOCKS digest mode,
+#   the fused product kernel tree-reduced across the block once per ell (32x per
+#   output word); mod-field distributivity lets one register-resident length-n dot
+#   product + a single block reduction produce the identical canonical word.
+#   ~1.5-2x faster fused kernel (validated 4096 words vs stock kernel AND a CPU
+#   reference, 0 mismatches).
 #   Build stock instead with --build-arg APPLY_LOCAL_PATCHES=0.
 ARG APPLY_LOCAL_PATCHES=1
 COPY patches/ /opt/btx-patches/
