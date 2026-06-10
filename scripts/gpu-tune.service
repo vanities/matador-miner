@@ -1,0 +1,30 @@
+# btx-miner GPU efficiency tuning — persists the undervolt-equivalent across reboots.
+# Tuned optimum (see bench/baseline.md + sweep): lock graphics clock 0-2600 MHz and
+# cap power at 520 W -> ~346 W actual draw at ~99% of the locked-clock hashrate,
+# vs ~571 W stock. nonces/watt is the target metric, not peak hashrate.
+#
+# Install (one-time, needs sudo):
+#   sudo cp /home/vanities/git/btx-miner/scripts/gpu-tune.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now gpu-tune.service
+# Verify:
+#   nvidia-smi --query-gpu=clocks.sm,power.limit,persistence_mode --format=csv
+# Revert to stock (until next boot):
+#   sudo nvidia-smi -rgc && sudo nvidia-smi -pl 575
+[Unit]
+Description=BTX miner GPU efficiency tuning (clock lock + power cap)
+After=multi-user.target
+Wants=multi-user.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# Persistence mode keeps the driver (and these settings) loaded between clients.
+ExecStart=/usr/bin/nvidia-smi -pm 1
+ExecStart=/usr/bin/nvidia-smi -lgc 0,2600
+ExecStart=/usr/bin/nvidia-smi -pl 520
+ExecStop=/usr/bin/nvidia-smi -rgc
+ExecStop=/usr/bin/nvidia-smi -pl 575
+
+[Install]
+WantedBy=multi-user.target
