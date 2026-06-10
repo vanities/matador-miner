@@ -15,11 +15,17 @@ BENCH="${BENCH:-/opt/btx/bin/btx-matmul-solve-bench}"   # compiled into the imag
 ITERS="${ITERS:-100}"
 DEFAULT_PL="${DEFAULT_PL:-575}"
 RESTART_MINER="${RESTART_MINER:-0}"
+SVC="${SVC:-btx-miner}"
 
 command -v nvidia-smi >/dev/null || { echo "nvidia-smi not found"; exit 1; }
 [ "$(id -u)" -eq 0 ] || { echo "Run as root (sudo) — nvidia-smi -pl needs it"; exit 1; }
 
-echo "Pausing miner for clean benches..."
+# v2 nonce-seed mode so the efficiency curve reflects LIVE mining (matrices
+# regenerate per nonce). The bare default caches matrix-gen — wrong for this.
+HEIGHT="${HEIGHT:-$(docker exec "$SVC" btx-cli -datadir=/data getblockcount 2>/dev/null || echo 126000)}"
+V2_FLAGS="--block-height $HEIGHT --nonce-seed-height 0 --product-digest-height 0"
+
+echo "Pausing miner for clean benches (v2 mode, height=$HEIGHT)..."
 docker compose stop >/dev/null 2>&1 || true
 
 printf '\n%-7s %-15s %-15s %s\n' "Watts" "median n/s" "mean n/s" "nonces/s per W"
@@ -31,7 +37,7 @@ for W in "${LIMITS[@]}"; do
   sleep 2
   out=$(timeout 220 docker run --rm --gpus all -v "$DATADIR_HOST":/data \
         --entrypoint "$BENCH" "$IMAGE" \
-        --backend cuda --n 512 --b 16 --r 8 --iterations "$ITERS" 2>/dev/null || true)
+        --backend cuda --n 512 --b 16 --r 8 --iterations "$ITERS" $V2_FLAGS 2>/dev/null || true)
   block=$(printf '%s' "$out" | grep -A6 '"nonces_per_sec"')
   med=$(printf '%s' "$block"  | grep '"median"' | grep -oE '[0-9]+\.[0-9]+' | head -1)
   mean=$(printf '%s' "$block" | grep '"mean"'   | grep -oE '[0-9]+\.[0-9]+' | head -1)
