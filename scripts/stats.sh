@@ -53,4 +53,20 @@ fi
 cyan "GPU"
 nvidia-smi --query-gpu=utilization.gpu,utilization.memory,clocks.current.sm,clocks.max.sm,power.draw,power.limit,temperature.gpu --format=csv,noheader 2>/dev/null \
   | awk -F', *' '{printf "util %s | mem %s | clk %s/%s | pwr %s/%s | %s\n",$1,$2,$3,$4,$5,$6,$7}'
-printf 'nonce/s   : ~121K @460W (solve-bench reference; no live meter)\n'
+# Live throughput meter: delta of the solver's cumulative nonce/digest counters
+# over a short sample. nonce attempts = nonces fed to the GPU digest; digest
+# batches = GPU kernel launches. These are the REAL live rates (the solve-bench
+# numbers are uncontended micro-benchmarks and run several x faster than live).
+if [ -n "${status:-}" ]; then
+  read -r N1 B1 < <(docker exec -i "$SVC" sh 2>/dev/null -c \
+    'btx-cli -datadir=/data getmatmulchallengeprofile 2>/dev/null | jq -r "[.service_profile.runtime_observability.solve_pipeline.batched_nonce_attempts, .service_profile.runtime_observability.solve_pipeline.batched_digest_requests] | @tsv"')
+  sleep 4
+  read -r N2 B2 < <(docker exec -i "$SVC" sh 2>/dev/null -c \
+    'btx-cli -datadir=/data getmatmulchallengeprofile 2>/dev/null | jq -r "[.service_profile.runtime_observability.solve_pipeline.batched_nonce_attempts, .service_profile.runtime_observability.solve_pipeline.batched_digest_requests] | @tsv"')
+  if [ -n "${N2:-}" ] && [ "${N2:-0}" -gt "${N1:-0}" ] 2>/dev/null; then
+    printf 'nonce/s   : %d nonce-attempts/s  ·  %d digest-batches/s  (live, 4s sample)\n' \
+      "$(( (N2-N1)/4 ))" "$(( (B2-B1)/4 ))"
+  else
+    printf 'nonce/s   : (warming up — counters not advancing yet)\n'
+  fi
+fi
