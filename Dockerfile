@@ -66,7 +66,15 @@ RUN git init -q \
 #   output word); mod-field distributivity lets one register-resident length-n dot
 #   product + a single block reduction produce the identical canonical word.
 #   ~1.5-2x faster fused kernel (validated 4096 words vs stock kernel AND a CPU
-#   reference, 0 mismatches).
+#   reference, 0 mismatches). Retained as the fallback path for shapes the
+#   factored patch below doesn't cover (n % 32 != 0) and for prefix mode.
+#   factored-compression.patch — same distributivity, taken further: compress
+#   weights fold into the RHS once per request (D[j][x][m] = sum_y W[x,y] *
+#   B'[m][j*b+y]), then one warp per output word contracts A' against D. Cuts
+#   per-candidate product MACs n^3=134M -> ~12.6M (~10.6x); kernel measured ~6.4x
+#   vs the single-reduction fused kernel. Byte-exact (validated 4096 words vs the
+#   stock fused kernel, 0 mismatches). Non-prefix mode only; adds a ~1 MiB/request
+#   device staging buffer per workspace slot.
 #   Build stock instead with --build-arg APPLY_LOCAL_PATCHES=0.
 ARG APPLY_LOCAL_PATCHES=1
 COPY patches/ /opt/btx-patches/
