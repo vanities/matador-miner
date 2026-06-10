@@ -33,6 +33,22 @@ Kernel-level: factored K1+K2 0.073 ms vs single-reduction fused 0.465 ms (**~6.4
 byte-exact vs the stock fused kernel (4096 words, 0 mismatches). Live: zero
 CPU-confirm mismatches post-deploy (exercises the packed-pointers variant).
 
-Day total: **126,066 → 485,967 median nonces/s (3.86×)**. The digest path is now
-matrix-gen-bound (windowed SHA); the next ceiling is the pre-hash scanner's
-~2.47M nonces/s, ~5× above current throughput.
+## Round 3 (same day): K2 2×2 tiles + scanner template midstates
+
+| Image | Patches | Median n/s | vs prev |
+|-------|---------|-----------:|--------:|
+| `btx-miner:prev3` (`9eecc41b`) | 4 patches | 488,981 | — |
+| `btx-miner:local` (`a2b431d0`) | + 2×2 K2 + midstate scanner | **564,473** | **+15.4%** |
+
+- `factored-compression.patch` updated: warp now computes a 2×2 word tile
+  (halves A/D L2 traffic at production batch sizes; flat at validator scale).
+- `template-midstate-scanner.patch`: block 0 of both scan messages is
+  nonce-independent (nonce @99/76, `which` @109) → midstates once per CUDA
+  block, 8 → 5 SHA compressions per scanned nonce. Validated vs the ORIGINAL
+  w[64] scanner: 200k nonces, 0 mismatches.
+
+Day total: **126,066 → 564,473 median nonces/s (4.48×)**, all five patches
+byte-exact-validated and upstreamed as btxchain/btx PR #58. Remaining headroom:
+the digest is matrix-gen-SHA-bound; scanner ceiling ~2.47M n/s. Parked ideas:
+8-round seed midstate inside matrix-gen (~+5% e2e), int8-limb tensor-core M31
+GEMM (~2× theoretical, high risk).
