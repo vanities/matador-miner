@@ -147,6 +147,66 @@ __global__ void ScanKernel(OracleSeedBytes prev,OracleSeedBytes merkle,uint32_t 
     for (uint32_t i=0;i<32;++i) out_sigma[(size_t)gid*32+i]=sigma[i];
 }
 
+// ---- MIDSTATE variant (mirrors template-midstate-scanner.patch): block-0 of the
+// seed_v2 (110B) and header-hash (150B) messages is nonce-independent, so its
+// compression happens once per CUDA block and per-nonce work drops 8 -> 5.
+__device__ inline void Sha256Block0Mid(const uint8_t* msg, uint32_t state[8]){
+    Sha256Init(state);
+    uint32_t m[16];
+    for(uint32_t w=0;w<16;++w){ uint32_t p=0; for(uint32_t b=0;b<4;++b) p=(p<<8U)|msg[w*4U+b]; m[w]=p; }
+    Sha256CompressW(state,m);
+}
+__device__ inline void Sha256BytesFromMid(const uint32_t mid[8],const uint8_t* msg,uint32_t len,uint8_t out[32]){
+    uint32_t state[8]; for(uint32_t i=0;i<8;++i) state[i]=mid[i];
+    const uint32_t tb=(len+9U+63U)/64U; const uint64_t bl=(uint64_t)len*8U;
+    for(uint32_t block=1;block<tb;++block){
+        uint32_t m[16]={};
+        for(uint32_t w=0;w<16;++w){ uint32_t p=0;
+            for(uint32_t b=0;b<4;++b){ const uint32_t mi=block*64U+w*4U+b; uint8_t v=0;
+                if(mi<len) v=msg[mi]; else if(mi==len) v=0x80U;
+                else { const uint32_t ls=tb*64U-8U; if(mi>=ls){ const uint32_t sh=(7U-(mi-ls))*8U; v=(uint8_t)((bl>>sh)&0xffU);} }
+                p=(p<<8U)|v; }
+            m[w]=p; }
+        Sha256CompressW(state,m);
+    }
+    for(uint32_t i=0;i<8;++i){ out[i*4U]=(uint8_t)((state[i]>>24)&0xff); out[i*4U+1]=(uint8_t)((state[i]>>16)&0xff); out[i*4U+2]=(uint8_t)((state[i]>>8)&0xff); out[i*4U+3]=(uint8_t)(state[i]&0xff); }
+}
+__device__ inline uint32_t BuildSeedMsg(const OracleSeedBytes& prev,const OracleSeedBytes& merkle,uint32_t height,uint32_t version,uint32_t time,uint32_t bits,uint64_t nonce,uint16_t dim,uint8_t which,uint8_t* msg){
+    uint32_t o=0; const char TAG[]="BTX_MATMUL_SEED_V2";
+    AppendByte(msg,o,18U); for(uint32_t i=0;i<18U;++i) AppendByte(msg,o,(uint8_t)TAG[i]);
+    AppendBytes(msg,o,prev.data,32U); AppendLE32(msg,o,height); AppendLE32(msg,o,version);
+    AppendBytes(msg,o,merkle.data,32U); AppendLE32(msg,o,time); AppendLE32(msg,o,bits);
+    AppendLE64(msg,o,nonce); AppendLE16(msg,o,dim); AppendByte(msg,o,which); return o;
+}
+__device__ inline uint32_t BuildHeaderMsg(uint32_t version,const OracleSeedBytes& prev,const OracleSeedBytes& merkle,uint32_t time,uint32_t bits,uint64_t nonce,uint16_t dim,const uint8_t sa[32],const uint8_t sb[32],uint8_t* msg){
+    uint32_t o=0;
+    AppendLE32(msg,o,version); AppendBytes(msg,o,prev.data,32U); AppendBytes(msg,o,merkle.data,32U);
+    AppendLE32(msg,o,time); AppendLE32(msg,o,bits); AppendLE64(msg,o,nonce); AppendLE16(msg,o,dim);
+    AppendBytes(msg,o,sa,32U); AppendBytes(msg,o,sb,32U); return o;
+}
+__global__ void ScanKernelMid(OracleSeedBytes prev,OracleSeedBytes merkle,uint32_t version,uint32_t height,uint32_t time,uint32_t bits,uint64_t start_nonce,uint16_t dim,uint32_t n,uint8_t* out_sigma){
+    __shared__ uint32_t seed_mid[8]; __shared__ uint32_t header_mid[8];
+    if(threadIdx.x==0){
+        uint8_t prefix[150];
+        BuildSeedMsg(prev,merkle,height,version,time,bits,0ULL,dim,0U,prefix);
+        Sha256Block0Mid(prefix,seed_mid);
+        BuildHeaderMsg(version,prev,merkle,time,bits,0ULL,dim,prev.data,prev.data,prefix);
+        Sha256Block0Mid(prefix,header_mid);
+    }
+    __syncthreads();
+    const uint32_t gid=blockIdx.x*blockDim.x+threadIdx.x; if (gid>=n) return;
+    const uint64_t nonce=start_nonce+(uint64_t)gid;
+    uint8_t msg[150],sa[32],sb[32],hh[32],sigma[32];
+    const uint32_t sl=BuildSeedMsg(prev,merkle,height,version,time,bits,nonce,dim,0U,msg);
+    Sha256BytesFromMid(seed_mid,msg,sl,sa);
+    msg[sl-1U]=1U;
+    Sha256BytesFromMid(seed_mid,msg,sl,sb);
+    const uint32_t hl=BuildHeaderMsg(version,prev,merkle,time,bits,nonce,dim,sa,sb,msg);
+    Sha256BytesFromMid(header_mid,msg,hl,hh);
+    Sha256BytesW(hh,32U,sigma);
+    for (uint32_t i=0;i<32;++i) out_sigma[(size_t)gid*32+i]=sigma[i];
+}
+
 int main(){
     const uint32_t N=200000;
     OracleSeedBytes prev,merkle; for(int i=0;i<32;++i){ prev.data[i]=(uint8_t)(i*7+1); merkle.data[i]=(uint8_t)(i*13+5); }
@@ -162,18 +222,29 @@ int main(){
     size_t mism=0; for(size_t i=0;i<(size_t)N*32;++i) if(o[i]!=w[i]) ++mism;
     printf("byte-exact: nonces=%u mismatches=%zu -> %s\n",N,mism,mism==0?"PASS":"FAIL");
     if(mism) return 1;
+    // --- midstate variant vs ORIGINAL (consensus reference) ---
+    uint8_t *d_m; cudaMalloc(&d_m,(size_t)N*32);
+    ScanKernelMid<<<blocks,ORACLE_THREADS>>>(prev,merkle,VER,H,T,BITS,SN,DIM,N,d_m);
+    e=cudaDeviceSynchronize(); if(e){ printf("CUDA err: %s\n",cudaGetErrorString(e)); return 2; }
+    uint8_t *m=(uint8_t*)malloc((size_t)N*32);
+    cudaMemcpy(m,d_m,(size_t)N*32,cudaMemcpyDeviceToHost);
+    mism=0; for(size_t i=0;i<(size_t)N*32;++i) if(o[i]!=m[i]) ++mism;
+    printf("midstate byte-exact: nonces=%u mismatches=%zu -> %s\n",N,mism,mism==0?"PASS":"FAIL");
+    if(mism) return 1;
     // --- throughput: orig vs windowed, interleaved rounds (contended w/ live miner; ratio is the signal) ---
     const int ITERS=300;
     cudaEvent_t s,e2; cudaEventCreate(&s); cudaEventCreate(&e2);
     for(int i=0;i<20;++i){ ScanKernel<false><<<blocks,ORACLE_THREADS>>>(prev,merkle,VER,H,T,BITS,SN,DIM,N,d_o); ScanKernel<true><<<blocks,ORACLE_THREADS>>>(prev,merkle,VER,H,T,BITS,SN,DIM,N,d_w);} cudaDeviceSynchronize();
-    printf("round   orig(MN/s)   win(MN/s)   speedup\n");
+    printf("round   orig(MN/s)   win(MN/s)   mid(MN/s)   win-vs-orig   mid-vs-win\n");
     for(int r=0;r<4;++r){
         cudaEventRecord(s); for(int i=0;i<ITERS;++i) ScanKernel<false><<<blocks,ORACLE_THREADS>>>(prev,merkle,VER,H,T,BITS,SN,DIM,N,d_o); cudaEventRecord(e2); cudaEventSynchronize(e2);
         float mo; cudaEventElapsedTime(&mo,s,e2);
         cudaEventRecord(s); for(int i=0;i<ITERS;++i) ScanKernel<true ><<<blocks,ORACLE_THREADS>>>(prev,merkle,VER,H,T,BITS,SN,DIM,N,d_w); cudaEventRecord(e2); cudaEventSynchronize(e2);
         float mw; cudaEventElapsedTime(&mw,s,e2);
-        double no=(double)N*ITERS/(mo/1000.0)/1e6, nw=(double)N*ITERS/(mw/1000.0)/1e6;
-        printf("%5d %11.1f %11.1f %+8.1f%%\n", r, no, nw, (nw/no-1.0)*100.0);
+        cudaEventRecord(s); for(int i=0;i<ITERS;++i) ScanKernelMid<<<blocks,ORACLE_THREADS>>>(prev,merkle,VER,H,T,BITS,SN,DIM,N,d_m); cudaEventRecord(e2); cudaEventSynchronize(e2);
+        float mm; cudaEventElapsedTime(&mm,s,e2);
+        double no=(double)N*ITERS/(mo/1000.0)/1e6, nw=(double)N*ITERS/(mw/1000.0)/1e6, nm=(double)N*ITERS/(mm/1000.0)/1e6;
+        printf("%5d %11.1f %11.1f %11.1f %+12.1f%% %+11.1f%%\n", r, no, nw, nm, (nw/no-1.0)*100.0, (nm/nw-1.0)*100.0);
     }
     return 0;
 }

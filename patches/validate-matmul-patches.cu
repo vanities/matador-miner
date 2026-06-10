@@ -235,28 +235,37 @@ __global__ void FactoredRhs(const Element* __restrict__ B,const Element* __restr
 }
 __global__ void FactoredWords(const Element* __restrict__ A,const Element* __restrict__ rhs,
                               uint32_t n,uint32_t bs,uint32_t bpa,uint32_t pcpr,uint32_t wpr,uint32_t me,uint32_t re,
-                              uint32_t total_pairs,Element* __restrict__ out){
+                              uint32_t total_tiles,Element* __restrict__ out){
+    // 2x2 word tile per warp (mirrors the patched ComputeFactoredWordsKernel)
     const uint32_t lane=threadIdx.x&31U;
-    const uint32_t pair=blockIdx.x*(blockDim.x>>5U)+(threadIdx.x>>5U);
-    if(pair>=total_pairs) return;
-    const uint32_t batch=pair/pcpr; const uint32_t lp=pair%pcpr;
-    const uint32_t j=lp%bpa; const uint32_t i=lp/bpa;
+    const uint32_t tile=blockIdx.x*(blockDim.x>>5U)+(threadIdx.x>>5U);
+    if(tile>=total_tiles) return;
+    const uint32_t tpa=bpa>>1U; const uint32_t tpr=tpa*tpa;
+    const uint32_t batch=tile/tpr; const uint32_t lt=tile%tpr;
+    const uint32_t j0=(lt%tpa)*2U; const uint32_t i0=(lt/tpa)*2U;
     const Element* ma=A+(size_t)batch*me; const Element* d=rhs+(size_t)batch*re;
-    uint64_t acc{0}; uint32_t pending{0};
+    uint64_t a00{0},a01{0},a10{0},a11{0}; uint32_t pending{0};
     for(uint32_t x=0;x<bs;++x){
-        const Element* a_row=ma+(size_t)(i*bs+x)*n;
-        const Element* d_row=d+(size_t)(j*bs+x)*n;
+        const Element* ar0=ma+(size_t)(i0*bs+x)*n; const Element* ar1=ar0+(size_t)bs*n;
+        const Element* dr0=d+(size_t)(j0*bs+x)*n;  const Element* dr1=dr0+(size_t)bs*n;
         for(uint32_t m=lane;m<n;m+=32U){
-            acc+=(uint64_t)a_row[m]*d_row[m];
-            if(++pending==REDUCE_INTERVAL){ acc=Reduce64(acc); pending=0; }
+            const uint64_t a0=ar0[m],a1=ar1[m],d0=dr0[m],d1=dr1[m];
+            a00+=a0*d0; a01+=a0*d1; a10+=a1*d0; a11+=a1*d1;
+            if(++pending==REDUCE_INTERVAL){ a00=Reduce64(a00); a01=Reduce64(a01); a10=Reduce64(a10); a11=Reduce64(a11); pending=0; }
         }
     }
-    Element value=Reduce64(acc);
+    Element v00=Reduce64(a00),v01=Reduce64(a01),v10=Reduce64(a10),v11=Reduce64(a11);
     for(uint32_t offset=16U;offset>0U;offset>>=1U){
-        const Element other=__shfl_down_sync(0xffffffffU,value,offset);
-        value=FieldAdd(value,other);
+        v00=FieldAdd(v00,__shfl_down_sync(0xffffffffU,v00,offset));
+        v01=FieldAdd(v01,__shfl_down_sync(0xffffffffU,v01,offset));
+        v10=FieldAdd(v10,__shfl_down_sync(0xffffffffU,v10,offset));
+        v11=FieldAdd(v11,__shfl_down_sync(0xffffffffU,v11,offset));
     }
-    if(lane==0) out[batch*wpr+lp]=value;
+    if(lane==0){
+        const uint32_t base=batch*wpr;
+        out[base+i0*bpa+j0]=v00; out[base+i0*bpa+j0+1U]=v01;
+        out[base+(i0+1U)*bpa+j0]=v10; out[base+(i0+1U)*bpa+j0+1U]=v11;
+    }
 }
 
 static uint64_t rng_state=0x243f6a8885a308d3ULL;
@@ -334,9 +343,10 @@ int main(){
     const size_t RT=(size_t)BATCH*RE;
     Element *d_rhs,*d_ff; CK(cudaMalloc(&d_rhs,RT*4)); CK(cudaMalloc(&d_ff,WT*4));
     const uint32_t rhs_blocks=(uint32_t)((RT+255)/256);
-    const uint32_t warps_per_block=256/32, word_blocks=(BATCH*PCPR+warps_per_block-1)/warps_per_block;
+    const uint32_t TILES=BATCH*((BPA/2)*(BPA/2));
+    const uint32_t warps_per_block=256/32, word_blocks=(TILES+warps_per_block-1)/warps_per_block;
     FactoredRhs<<<rhs_blocks,256>>>(dB,dC,N,BS,RT,RE,ME,CE,d_rhs);
-    FactoredWords<<<word_blocks,256>>>(dA,d_rhs,N,BS,BPA,PCPR,WPR,ME,RE,BATCH*PCPR,d_ff);
+    FactoredWords<<<word_blocks,256>>>(dA,d_rhs,N,BS,BPA,PCPR,WPR,ME,RE,TILES,d_ff);
     CK(cudaDeviceSynchronize());
     Element* hff=(Element*)malloc(WT*4);
     CK(cudaMemcpy(hff,d_ff,WT*4,cudaMemcpyDeviceToHost));
@@ -367,7 +377,7 @@ int main(){
         const int FI=20;
         CK(cudaEventRecord(s)); for(int i=0;i<FI;++i) FusedNew<<<fgrid,MAX_BLOCK_THREADS>>>(dA,dB,dC,N,BS,BPA,PCPR,WPR,ME,CE,d_fn); CK(cudaEventRecord(e)); CK(cudaEventSynchronize(e));
         CK(cudaEventElapsedTime(&ms,s,e)); const double fn=ms/FI;
-        CK(cudaEventRecord(s)); for(int i=0;i<FI;++i){ FactoredRhs<<<rhs_blocks,256>>>(dB,dC,N,BS,RT,RE,ME,CE,d_rhs); FactoredWords<<<word_blocks,256>>>(dA,d_rhs,N,BS,BPA,PCPR,WPR,ME,RE,BATCH*PCPR,d_ff); } CK(cudaEventRecord(e)); CK(cudaEventSynchronize(e));
+        CK(cudaEventRecord(s)); for(int i=0;i<FI;++i){ FactoredRhs<<<rhs_blocks,256>>>(dB,dC,N,BS,RT,RE,ME,CE,d_rhs); FactoredWords<<<word_blocks,256>>>(dA,d_rhs,N,BS,BPA,PCPR,WPR,ME,RE,TILES,d_ff); } CK(cudaEventRecord(e)); CK(cudaEventSynchronize(e));
         CK(cudaEventElapsedTime(&ms,s,e)); const double ff=ms/FI;
         printf("factored[%d]     %10.3f %10.3f  %+7.1f%%   (col1=fused-new, col2=factored K1+K2)\n",r,fn,ff,(fn/ff-1.0)*100.0);
     }
