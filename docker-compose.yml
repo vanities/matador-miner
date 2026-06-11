@@ -51,5 +51,11 @@ services:
       BTX_PAYOUT_ADDRESS: ${BTX_PAYOUT_ADDRESS:-}
       BTX_POOL_HOST: minebtx.com
       BTX_POOL_PORT: "3333"
+      BTX_POOL_WORKER: ${BTX_POOL_WORKER:-KING}
+      # gpu_inputs=1 default: on-GPU input generation. Verified on the 5090 this
+      # takes the card from ~5% util (the pool's CPU-gated gpu_inputs:0 default,
+      # which starves a fast GPU) to ~70-85% with shares landing. Override with
+      # BTX_GPU_INPUTS=0 for a slow card where CPU-side prep keeps up.
+      BTX_GPU_INPUTS: ${BTX_GPU_INPUTS:-1}
     # NO volumes: the pool client needs no wallet/chain data — payout is to a
     # public address, so no keys are mounted into the third-party solver.
