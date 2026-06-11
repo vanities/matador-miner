@@ -1,20 +1,20 @@
 # Isolated BTX GPU solo-miner — COMPILES btxchain/btx from source.
 #
-# Pinned to the v0.32.4 tag commit, compiled WITH the CUDA MatMul backend.
+# Pinned to the v0.32.5 tag commit, compiled WITH the CUDA MatMul backend.
 # Upstream ships GPG-signed cuda13 prebuilts for tagged releases, but we compile
 # by choice: it guarantees native sm_120 codegen for the RTX 5090 (the prebuilt's
 # embedded archs are unverified) and yields a byte-reproducible build from an
 # immutable SHA. To run the signed prebuilt instead, set BTX_INSTALL_MODE=release
-# + RELEASE_TAG=v0.32.4 in docker-compose.yml (the entrypoint keeps that path).
+# + RELEASE_TAG=v0.32.5 in docker-compose.yml (the entrypoint keeps that path).
 #
-# 0.32.4 is a NON-CONSENSUS operator-safety/hardening point release on top of
-# 0.32.3: wallet-backup passphrase-safety metadata, live-mining supervisor
-# hardening, node-local reorg/policy hardening, shielded recovery-exit fix. It
-# adds NO activation height. The CUDA kernels (src/cuda/*) are byte-identical to
-# 0.32.3, so all six local patches apply unchanged; the one matmul field.cpp
-# change is an ARM-NEON self-test, irrelevant to the x86/CUDA path. (0.32.3 had
-# added the on-GPU pre-hash scanner; 0.32.2 was the mandatory block-125,000
-# shielded-sunset + nonce-seed-v2 fork, activated 2026-06-08.)
+# 0.32.5 is a NON-CONSENSUS point release whose ONLY functional change is an
+# Apple Metal product-digest fix (every src/ change is under src/metal/ + tests);
+# it adds NO activation height and is a no-op for this x86/CUDA build. We track it
+# purely to stay on the latest tag. The CUDA kernels (src/cuda/*) are byte-identical
+# all the way back through 0.32.3, so all six local patches apply unchanged.
+# (0.32.4 was operator-safety/hardening; 0.32.3 added the on-GPU pre-hash scanner;
+# 0.32.2 was the mandatory block-125,000 shielded-sunset + nonce-seed-v2 fork,
+# activated 2026-06-08.)
 #
 # Trust boundary note: the release signing key is integrity-only (self-published
 # with the release, nobody independent vouches — see entrypoint.sh), so a pinned
@@ -33,9 +33,9 @@ ARG CUDA_RUNTIME_IMAGE=nvidia/cuda:13.0.0-runtime-ubuntu24.04
 FROM ${CUDA_DEVEL_IMAGE} AS builder
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Exact upstream commit to compile. b9cccaf = the v0.32.4 release tag commit. An
+# Exact upstream commit to compile. 87bb8dea = the v0.32.5 release tag commit. An
 # immutable SHA means every rebuild on every box produces a byte-identical tree.
-ARG BTX_SOURCE_REF=b9cccaf6631a041e395ddbd365a7466f92bd04ed
+ARG BTX_SOURCE_REF=87bb8dea8cc834dc3fad5fb846368f2ba0a3f266
 # sm_120 = NVIDIA Blackwell (RTX 5090). Other GPUs: Ada=89, Hopper=90, Ampere=80/86.
 ARG BTX_CUDA_ARCHITECTURES=120
 
