@@ -3,12 +3,13 @@ services:
     build:
       context: .
       args:
-        # 0.32.3 compiled from source. Signed cuda13 prebuilts exist for releases,
+        # 0.32.4 compiled from source. Signed cuda13 prebuilts exist for releases,
         # but we compile by choice: it guarantees native sm_120 codegen for the
         # 5090 (the prebuilt's embedded archs are unverified) and yields a
-        # byte-reproducible build from a pinned tag commit. 0.32.3 = the official
-        # CUDA v2 nonce-seed GPU solver (full on-GPU pre-hash scan) + shielded fix.
-        BTX_SOURCE_REF: 898b170930b2de4690521d3616a87c4ed4bb0f4b
+        # byte-reproducible build from a pinned tag commit. 0.32.4 = a non-consensus
+        # operator-safety/hardening point release; CUDA kernels unchanged from
+        # 0.32.3, so the six local patches apply unchanged.
+        BTX_SOURCE_REF: b9cccaf6631a041e395ddbd365a7466f92bd04ed
         BTX_CUDA_ARCHITECTURES: "120"   # sm_120 = RTX 5090 (Blackwell)
         # Local windowed-SHA scanner patch (byte-exact, +5.4%) is applied by
         # default (see Dockerfile + patches/). Build stock upstream instead with:

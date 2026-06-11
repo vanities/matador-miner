@@ -1,16 +1,20 @@
 # Isolated BTX GPU solo-miner — COMPILES btxchain/btx from source.
 #
-# Pinned to the v0.32.3 tag commit, compiled WITH the CUDA MatMul backend.
+# Pinned to the v0.32.4 tag commit, compiled WITH the CUDA MatMul backend.
 # Upstream ships GPG-signed cuda13 prebuilts for tagged releases, but we compile
 # by choice: it guarantees native sm_120 codegen for the RTX 5090 (the prebuilt's
 # embedded archs are unverified) and yields a byte-reproducible build from an
 # immutable SHA. To run the signed prebuilt instead, set BTX_INSTALL_MODE=release
-# + RELEASE_TAG=v0.32.3 in docker-compose.yml (the entrypoint keeps that path).
+# + RELEASE_TAG=v0.32.4 in docker-compose.yml (the entrypoint keeps that path).
 #
-# 0.32.3 is a MINING-side update: the CUDA MatMul nonce-seed v2 solver gains a
-# full on-GPU pre-hash scanner (~2.47M nonces/s vs ~14k batch-of-1), plus a
-# shielded-state recovery fix. NOT a consensus change. The mandatory upgrade was
-# 0.32.2 (block-125,000 shielded sunset + nonce-seed v2), activated 2026-06-08.
+# 0.32.4 is a NON-CONSENSUS operator-safety/hardening point release on top of
+# 0.32.3: wallet-backup passphrase-safety metadata, live-mining supervisor
+# hardening, node-local reorg/policy hardening, shielded recovery-exit fix. It
+# adds NO activation height. The CUDA kernels (src/cuda/*) are byte-identical to
+# 0.32.3, so all six local patches apply unchanged; the one matmul field.cpp
+# change is an ARM-NEON self-test, irrelevant to the x86/CUDA path. (0.32.3 had
+# added the on-GPU pre-hash scanner; 0.32.2 was the mandatory block-125,000
+# shielded-sunset + nonce-seed-v2 fork, activated 2026-06-08.)
 #
 # Trust boundary note: the release signing key is integrity-only (self-published
 # with the release, nobody independent vouches — see entrypoint.sh), so a pinned
@@ -29,9 +33,9 @@ ARG CUDA_RUNTIME_IMAGE=nvidia/cuda:13.0.0-runtime-ubuntu24.04
 FROM ${CUDA_DEVEL_IMAGE} AS builder
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Exact upstream commit to compile. 898b170 = the v0.32.3 release tag commit. An
+# Exact upstream commit to compile. b9cccaf = the v0.32.4 release tag commit. An
 # immutable SHA means every rebuild on every box produces a byte-identical tree.
-ARG BTX_SOURCE_REF=898b170930b2de4690521d3616a87c4ed4bb0f4b
+ARG BTX_SOURCE_REF=b9cccaf6631a041e395ddbd365a7466f92bd04ed
 # sm_120 = NVIDIA Blackwell (RTX 5090). Other GPUs: Ada=89, Hopper=90, Ampere=80/86.
 ARG BTX_CUDA_ARCHITECTURES=120
 
