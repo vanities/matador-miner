@@ -58,6 +58,6 @@ YAML
 
 log "pool=${POOL_HOST}:${POOL_PORT}  worker=${WORKER}  backend=${BTX_SOLVER_BACKEND:-cuda}  threads=${THREADS}"
 log "payout → ${ADDRESS}"
-log "NOTE: pool mode uses the pool's btx-gbt-solve (v0.32.2-based), NOT our patched solver."
+log "NOTE: pool mode uses the pool's btx-gbt-solve (BTX v0.32.5 + our PR#58 kernels), NOT our node solver."
 
 exec dexbtx-miner --config "$CONFIG"

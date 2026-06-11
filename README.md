@@ -65,13 +65,15 @@ make solo     # switch back to solo
 make pool-logs
 ```
 
-Trade-off: pool mode runs the pool's own `btx-gbt-solve` (a v0.32.2-based
-binary, SHA256-verified at build), which is **slower than our solo solver** and
-takes a 2.5% fee — but it pays out steadily (weekly PPLNS) instead of solo's
-all-or-nothing block lottery. Solo and pool can't run at once (one GPU), so the
-targets stop one before starting the other. The pool client runs in its own
-container with **no wallet/chain mount** — payouts go to your public `btx1z...`
-address, no keys are exposed.
+Trade-off: pool mode runs the pool's own `btx-gbt-solve` (BTX v0.32.5,
+SHA256-verified at build). As of that build the pool **adopted our PR#58 GPU
+kernel optimizations**, so it's now roughly comparable to our solo solver rather
+than the ~3× sacrifice the old 0.32.2 build was — pool mode now trades just the
+2.5% fee for steady weekly PPLNS payouts instead of solo's all-or-nothing block
+lottery. Solo and pool can't run at once (one GPU), so the targets stop one
+before starting the other. The pool client runs in its own container with **no
+wallet/chain mount** — payouts go to your public `btx1z...` address, no keys are
+exposed.
 
 ## Monitor
 
