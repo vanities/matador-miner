@@ -33,8 +33,9 @@ services:
   # so plain `docker compose up -d` (and `make up`) NEVER starts it — only
   # `make pool` does. Solo and pool can't run at once (they'd fight over the GPU),
   # so the make targets stop one before starting the other. Pool mode uses the
-  # pool's own btx-gbt-solve (v0.32.2-based) — SLOWER than our solo solver — and
-  # trades that for steady PPLNS payouts. See Dockerfile.pool for the trust note.
+  # pool's own btx-gbt-solve (BTX v0.32.5 — now ships our PR#58 kernels, so it's
+  # roughly comparable to solo) and trades a 2.5% fee for steady PPLNS payouts.
+  # See Dockerfile.pool for the trust note.
   btx-pool:
     profiles: ["pool"]             # opt-in: started only via `make pool`
     build:

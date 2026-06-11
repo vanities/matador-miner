@@ -1,9 +1,15 @@
 # Optional POOL-mining mode — connects to the DEXBTX / minebtx pool instead of
 # solo-mining with our patched node. This is a SEPARATE, self-contained image:
-# it does NOT use our optimized 0.32.3+patches solver. The pool drives its own
-# closed `btx-gbt-solve` binary (built off BTX v0.32.2, CPU-gated input gen), so
-# pool mode trades our ~3x solo throughput for steady PPLNS payouts (2.5% fee,
-# weekly). Use it for variance smoothing, not for peak hashrate — solo is faster.
+# solo (the default) still uses OUR node's optimized solver.
+#
+# As of btx-prebuilds-v0.32.5 the pool's closed `btx-gbt-solve` binary ships our
+# PR#58 GPU kernel opts (the pool adopted them — see release notes "BTX v0.32.5 +
+# PR58 GPU saturation kernels + C4 continuous feeding") plus their own C4
+# job-feeding. So pool mode is no longer the ~3x throughput sacrifice it was on
+# the old 0.32.2 CPU-gated build — it's now roughly comparable to solo, trading a
+# 2.5% fee for steady weekly PPLNS payouts vs solo's block lottery. (A precise
+# solo-vs-pool speed gap would need a benchmark; solo still has on-GPU input gen
+# the pool's gpu_inputs:0 path lacks, so it may stay a touch ahead.)
 #
 # We replicate https://minebtx.com/install.sh's steps with PINNED versions
 # (rather than `curl | bash`) so the build is reproducible and the closed solver
@@ -18,12 +24,13 @@ ARG CUDA_RUNTIME_IMAGE=nvidia/cuda:12.8.0-runtime-ubuntu24.04
 FROM ${CUDA_RUNTIME_IMAGE}
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Pins mirrored from minebtx install.sh (INSTALL_SH_VERSION 0.3.14):
-#   - dexbtx-miner Python package (the stratum orchestrator)
-#   - btx-gbt-solve x86_64 CUDA solver + its pinned SHA256
-ARG DEXBTX_MINER_PKG_URL=https://github.com/dexbtx/minebtx/archive/refs/tags/v0.4.6.tar.gz
-ARG SOLVER_URL=https://github.com/dexbtx/minebtx/releases/download/btx-prebuilds-v0.32.2/btx-gbt-solve
-ARG SOLVER_SHA256=bc605267a91d9840190d9b12a67354666418b989fd56138ab4fa4d924a8481a0
+# Pins for the current minebtx release (matched pair: package v0.4.11 targets the
+# btx-prebuilds-v0.32.5 solver). SOLVER_SHA256 verified by download 2026-06-11.
+#   - dexbtx-miner Python package (the stratum orchestrator + C4 job feeding)
+#   - btx-gbt-solve x86_64 CUDA solver (BTX v0.32.5 + our PR#58 kernels) + SHA256
+ARG DEXBTX_MINER_PKG_URL=https://github.com/dexbtx/minebtx/archive/refs/tags/v0.4.11.tar.gz
+ARG SOLVER_URL=https://github.com/dexbtx/minebtx/releases/download/btx-prebuilds-v0.32.5/btx-gbt-solve
+ARG SOLVER_SHA256=e0505f848c4561496014f09ad5e5b267f8244723af46dccfac44f269785cbae3
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
       python3 python3-pip curl ca-certificates \
