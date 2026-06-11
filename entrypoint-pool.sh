@@ -48,7 +48,7 @@ solver_batch_size: ${BTX_SOLVER_BATCH_SIZE:-128}
 solver_prefetch_depth: ${BTX_SOLVER_PREFETCH:-8}
 solver_prepare_workers: ${BTX_SOLVER_WORKERS:-16}
 solver_pipeline_async: 1
-gpu_inputs: 0
+gpu_inputs: ${BTX_GPU_INPUTS:-0}
 
 nonces_per_slice: 2000000
 reconnect_initial_s: 1.0
@@ -56,7 +56,7 @@ reconnect_max_s: 60.0
 log_level: "INFO"
 YAML
 
-log "pool=${POOL_HOST}:${POOL_PORT}  worker=${WORKER}  backend=${BTX_SOLVER_BACKEND:-cuda}  threads=${THREADS}"
+log "pool=${POOL_HOST}:${POOL_PORT}  worker=${WORKER}  backend=${BTX_SOLVER_BACKEND:-cuda}  threads=${THREADS}  gpu_inputs=${BTX_GPU_INPUTS:-0}"
 log "payout → ${ADDRESS}"
 log "NOTE: pool mode uses the pool's btx-gbt-solve (BTX v0.32.5 + our PR#58 kernels), NOT our node solver."
 
