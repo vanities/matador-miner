@@ -122,6 +122,13 @@ addnode=101.190.74.74:19335
 addnode=101.190.6.79:19335
 addnode=1.156.47.118:19335
 addnode=124.168.58.173:19335
+# Fresh high-score, synced peers from the minebtx live list (2026-06-12), US-first
+# for low ping (Adam is US/TN) + a couple synced EU for redundancy. Supplements the
+# older seeds above, several of which had gone stale. Refresh from minebtx.com/peers.
+addnode=216.243.220.55:19335
+addnode=178.128.156.73:19335
+addnode=46.101.240.240:19335
+addnode=79.127.128.100:19335
 CONF
 fi
 
