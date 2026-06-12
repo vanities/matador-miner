@@ -1,21 +1,21 @@
 # Isolated BTX GPU solo-miner — COMPILES btxchain/btx from source.
 #
-# Pinned to the v0.32.6 tag commit, compiled WITH the CUDA MatMul backend.
+# Pinned to the v0.32.7 tag commit, compiled WITH the CUDA MatMul backend.
 # Upstream ships GPG-signed cuda13 prebuilts for tagged releases, but we compile
 # by choice: it guarantees native sm_120 codegen for the RTX 5090 (the prebuilt's
 # embedded archs are unverified) and yields a byte-reproducible build from an
 # immutable SHA. To run the signed prebuilt instead, set BTX_INSTALL_MODE=release
-# + RELEASE_TAG=v0.32.6 in docker-compose.yml (the entrypoint keeps that path).
+# + RELEASE_TAG=v0.32.7 in docker-compose.yml (the entrypoint keeps that path).
 #
-# 0.32.6 is a CONSENSUS-side hardening point release: it tightens shielded
-# recovery-exit + transparent-exit validation and adds a block-128,000 cleanup
-# boundary for proofless transparent-funded V2_SEND public-flow shielding (touches
-# validation.cpp, chainparams, consensus/params.h, the shielded/ path, miner.cpp).
-# Worth taking so a validating node stays on current consensus rules. It does NOT
-# touch src/cuda/, so all six local patches apply byte-for-byte unchanged.
-# (0.32.5 was an Apple-Metal-only digest fix, a no-op here; 0.32.4 was
-# operator-safety hardening; 0.32.3 added the on-GPU pre-hash scanner; 0.32.2 was
-# the mandatory block-125,000 shielded-sunset + nonce-seed-v2 fork, 2026-06-08.)
+# 0.32.7 is a btx-node sync point release (tag cut 2026-06-12; GitHub release page
+# not yet published, same lag as past tags). The diff touches validation.cpp,
+# chainparams.cpp, node/miner.cpp + txmempool, plus an assumeutxo-snapshot refresh
+# (generate_assumeutxo / apply_assumeutxo_report). No new activation height shows in
+# the diff. It does NOT touch src/cuda/, so all six local patches apply byte-for-byte
+# unchanged. (0.32.6 hardened shielded recovery-exit validation + the block-128,000
+# cleanup boundary; 0.32.5 was Apple-Metal-only; 0.32.4 operator-safety hardening;
+# 0.32.3 added the on-GPU pre-hash scanner; 0.32.2 was the mandatory block-125,000
+# shielded-sunset + nonce-seed-v2 fork, 2026-06-08.)
 #
 # Trust boundary note: the release signing key is integrity-only (self-published
 # with the release, nobody independent vouches — see entrypoint.sh), so a pinned
@@ -34,9 +34,9 @@ ARG CUDA_RUNTIME_IMAGE=nvidia/cuda:13.0.0-runtime-ubuntu24.04
 FROM ${CUDA_DEVEL_IMAGE} AS builder
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Exact upstream commit to compile. 0e692ee = the v0.32.6 release tag commit. An
+# Exact upstream commit to compile. 3847b2cc = the v0.32.7 release tag commit. An
 # immutable SHA means every rebuild on every box produces a byte-identical tree.
-ARG BTX_SOURCE_REF=0e692ee2024b01fc4bede3d4834d7263f3f4ce7a
+ARG BTX_SOURCE_REF=3847b2cc89e562668d360fb4fd35fbdca7cf1da4
 # sm_120 = NVIDIA Blackwell (RTX 5090). Other GPUs: Ada=89, Hopper=90, Ampere=80/86.
 ARG BTX_CUDA_ARCHITECTURES=120
 
