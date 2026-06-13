@@ -75,6 +75,14 @@ solo: ## Switch back to SOLO mining (our patched node) — stops pool
 	@$(COMPOSE) up -d $(SVC)
 	@echo "Solo mining (our optimized solver)."
 
+node: ## Run the node ONLY (wallet + RPC, no mining, no GPU compute) — start alongside the pool so balance/stats/status work while pooling
+	@echo "Starting NODE-ONLY btxd: wallet + RPC, no mining, no GPU compute."
+	@echo "It shares the card harmlessly with the pool (holds a context, runs no solver kernels)."
+	@BTX_MINING_ENABLED=0 $(COMPOSE) up -d --build $(SVC)
+	@echo "Booting (one shielded-state warmup; faster on 0.32.8). Once RPC is up:"
+	@echo "  make balance   |   make stats   |   make status   |   make address"
+	@echo "Stop just the node (keep pooling): $(COMPOSE) stop $(SVC)   |   Back to mining: make solo"
+
 pool-logs: ## Follow the pool miner logs
 	@$(COMPOSE) logs -f btx-pool
 

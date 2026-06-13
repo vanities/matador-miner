@@ -3,28 +3,33 @@ services:
     build:
       context: .
       args:
-        # 0.32.7 compiled from source. Signed cuda13 prebuilts exist for releases,
+        # 0.32.8 compiled from source. Signed cuda13 prebuilts exist for releases,
         # but we compile by choice: it guarantees native sm_120 codegen for the
         # 5090 (the prebuilt's embedded archs are unverified) and yields a
-        # byte-reproducible build from a pinned tag commit. 0.32.7 = btx-node sync
-        # (validation/chainparams/miner/mempool + assumeutxo refresh); src/cuda
-        # untouched, so the six local patches apply unchanged.
-        BTX_SOURCE_REF: 3847b2cc89e562668d360fb4fd35fbdca7cf1da4
+        # byte-reproducible build from a pinned tag commit. 0.32.8 = btx-node sync
+        # (recovery-exit/mempool/reorg hardening + CUDA solver perf); it UPSTREAMS
+        # our six PR #58 CUDA patches, so they're now disabled (APPLY_LOCAL_PATCHES=0).
+        BTX_SOURCE_REF: 9ce6774d27bf026c9673c1d39f196dc2ee144259
         BTX_CUDA_ARCHITECTURES: "120"   # sm_120 = RTX 5090 (Blackwell)
-        # Local windowed-SHA scanner patch (byte-exact, +5.4%) is applied by
-        # default (see Dockerfile + patches/). Build stock upstream instead with:
-        #   APPLY_LOCAL_PATCHES: "0"
+        # Our six PR #58 CUDA patches were upstreamed into 0.32.8, so the local
+        # patches are OFF by default now (APPLY_LOCAL_PATCHES=0 in the Dockerfile).
+        # Force-apply against an older base with:  APPLY_LOCAL_PATCHES: "1"
     image: btx-miner:local
     container_name: btx-miner
     restart: unless-stopped         # keep the miner up across daemon/host hiccups
     stop_grace_period: 120s        # give btxd time to flush cleanly on stop (entrypoint traps SIGTERM)
     gpus: all                      # requires nvidia-container-toolkit on the host
     environment:
-      # source  = run the 0.32.3 binaries compiled into the image (default).
+      # source  = run the 0.32.8 binaries compiled into the image (default).
       # release = download + GPG-verify the signed precompiled release instead;
-      #           for that, also set RELEASE_TAG=v0.32.3 here.
+      #           for that, also set RELEASE_TAG=v0.32.8 here.
       BTX_INSTALL_MODE: source
       BTX_MATMUL_BACKEND: cuda
+      # 1 (default) = node + GPU mining (solo). 0 = NODE-ONLY: run btxd for the
+      # wallet/RPC with NO mining and NO GPU, so it can sit alongside btx-pool and
+      # let `make balance`/`make stats` work while pooling. `make node` sets this 0;
+      # `make solo` leaves it at the default 1. See entrypoint.sh step 5d.
+      BTX_MINING_ENABLED: ${BTX_MINING_ENABLED:-1}
     volumes:
       - ./btx-data:/data           # blockchain + YOUR wallet (self-custody) — back this up
     # Intentionally NO published ports: the RPC interface stays inside the container.
@@ -33,8 +38,8 @@ services:
   # so plain `docker compose up -d` (and `make up`) NEVER starts it — only
   # `make pool` does. Solo and pool can't run at once (they'd fight over the GPU),
   # so the make targets stop one before starting the other. Pool mode uses the
-  # pool's own btx-gbt-solve (BTX v0.32.5 — now ships our PR#58 kernels, so it's
-  # roughly comparable to solo) and trades a 2.5% fee for steady PPLNS payouts.
+  # pool's own btx-gbt-solve (BTX v0.32.8 — ships our PR#58 kernels, now upstreamed,
+  # so it's roughly comparable to solo) and trades a 2.5% fee for steady PPLNS payouts.
   # See Dockerfile.pool for the trust note.
   btx-pool:
     profiles: ["pool"]             # opt-in: started only via `make pool`
