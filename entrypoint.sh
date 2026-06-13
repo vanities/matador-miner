@@ -179,6 +179,29 @@ if [ "${BTX_USE_SNAPSHOT:-1}" = "1" ] && [ ! -f "$DATADIR/.snapshot_loaded" ]; t
   fi
 fi
 
+# 5d) NODE-ONLY mode (BTX_MINING_ENABLED=0): keep the provisioning btxd up to
+#     serve the wallet + RPC (make balance / stats / address) WITHOUT mining or
+#     touching the GPU, so it can run alongside the pool (which owns the GPU).
+#     The provisioning daemon started above is already up with the wallet loaded;
+#     just supervise it here and flush cleanly on SIGTERM. No mining loop, no
+#     generatetoaddress, so the card stays 100% available to btx-pool.
+if [ "${BTX_MINING_ENABLED:-1}" = "0" ]; then
+  node_only_stop() {
+    log "[node] shutdown signal — flushing btxd cleanly..."
+    "$CLI" -datadir="$DATADIR" stop >/dev/null 2>&1 || true
+    for _ in $(seq 1 115); do "$CLI" -datadir="$DATADIR" getblockcount >/dev/null 2>&1 || break; sleep 1; done
+    log "[node] btxd stopped cleanly."
+    exit 0
+  }
+  trap node_only_stop TERM INT
+  log "[node] NODE-ONLY mode: btxd stays up for wallet/RPC (make balance / stats / address). No mining, no GPU."
+  # Supervise: keep PID 1 alive while btxd answers RPC; short poll so a SIGTERM
+  # lands promptly (the trap fires between sleeps, not after a long blocking wait).
+  while "$CLI" -datadir="$DATADIR" getblockcount >/dev/null 2>&1; do sleep 15; done
+  log "[node] btxd stopped responding unexpectedly; exiting for restart."
+  exit 1
+fi
+
 log "Stopping provisioning daemon; mining loop takes over next..."
 "$CLI" -datadir="$DATADIR" stop >/dev/null 2>&1 || true
 for _ in $(seq 1 30); do "$CLI" -datadir="$DATADIR" getblockchaininfo >/dev/null 2>&1 || break; sleep 1; done
