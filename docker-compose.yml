@@ -57,10 +57,10 @@ services:
       BTX_POOL_HOST: minebtx.com
       BTX_POOL_PORT: "3333"
       BTX_POOL_WORKER: ${BTX_POOL_WORKER:-KING}
-      # 16 = the pool's canonical + benchmark-best on this card. With gpu_inputs=1
+      # 12 (down from 16) per tuning: sustains ~17K on this card. With gpu_inputs=1
       # the solver is GPU-bound so 12-24 are all within ~0.5% (thread count only
-      # matters on the CPU-gated gpu_inputs=0 path); 16 is just the tidy default.
-      BTX_SOLVER_THREADS: ${BTX_SOLVER_THREADS:-16}
+      # matters on the CPU-gated gpu_inputs=0 path); 12 leaves more CPU headroom.
+      BTX_SOLVER_THREADS: ${BTX_SOLVER_THREADS:-12}
       # gpu_inputs=1 default: on-GPU input generation. Verified on the 5090 this
       # takes the card from ~5% util (the pool's CPU-gated gpu_inputs:0 default,
       # which starves a fast GPU) to ~70-85% with shares landing. Override with
