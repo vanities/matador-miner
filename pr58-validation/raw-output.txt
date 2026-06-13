@@ -1,0 +1,104 @@
+######################################################################
+# CUDA hardware validation: raw command output
+# host: a9c5050fdf51   date: 2026-06-13T03:58:08Z
+######################################################################
+
+===== 0. environment =====
+
+$ nvidia-smi -L
+GPU 0: NVIDIA GeForce RTX 5090 (UUID: GPU-164e2cce-f7b3-b0a1-d5b7-e9804f7ebf10)
+  (exit=0)
+
+$ nvidia-smi --query-gpu=driver_version,name --format=csv,noheader
+595.71.05, NVIDIA GeForce RTX 5090
+  (exit=0)
+
+$ nvcc --version | grep -i release
+Cuda compilation tools, release 12.8, V12.8.61
+  (exit=0)
+
+$ compute-sanitizer --version | head -2
+NVIDIA (R) Compute Sanitizer
+Copyright (c) 2020-2025 NVIDIA Corporation
+  (exit=0)
+
+===== 1. build + run: matmul parity harness =====
+
+$ nvcc -arch=sm_120 -O3 -o matmul_test validate-matmul-patches.cu
+  (exit=0)
+
+$ ./matmul_test
+matrixgen byte-exact: seeds=8 elements=2097152 mismatches=0 -> PASS
+retry/fallback byte-exact: cases=65536 mismatches=0 -> PASS
+matrixgen midstate byte-exact: elements=2097152 mismatches=0 -> PASS
+fused orig-vs-new byte-exact: words=4096 mismatches=0 -> PASS
+fused vs CPU reference: pairs=64 mismatches=0 -> PASS
+factored vs fused-orig byte-exact: words=4096 mismatches=0 -> PASS
+
+kernel              orig(ms)    new(ms)   speedup
+matrixgen[0]         0.313      0.103   +204.5%
+matrixgen[1]         0.335      0.102   +226.8%
+matrixgen[2]         0.314      0.103   +204.5%
+fused[0]             0.357      0.208    +72.1%
+fused[1]             0.333      0.208    +60.2%
+fused[2]             0.335      0.208    +60.9%
+factored[0]          0.208      0.073   +183.9%   (col1=fused-new, col2=factored K1+K2)
+factored[1]          0.208      0.072   +190.0%   (col1=fused-new, col2=factored K1+K2)
+factored[2]          0.208      0.072   +188.5%   (col1=fused-new, col2=factored K1+K2)
+
+ALL PASS
+  (exit=0)
+
+===== 2. build + run: SHA windowed-scanner parity harness =====
+
+$ nvcc -arch=sm_120 -O3 -o sha_test validate-sha-windowed-scanner.cu
+validate-sha-windowed-scanner.cu(14): warning #177-D: variable "MODULUS" was declared but never referenced
+  constexpr uint32_t MODULUS = 0x7fffffffU;
+                     ^
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+  (exit=0)
+
+$ ./sha_test
+byte-exact: nonces=200000 mismatches=0 -> PASS
+midstate byte-exact: nonces=200000 mismatches=0 -> PASS
+round   orig(MN/s)   win(MN/s)   mid(MN/s)   win-vs-orig   mid-vs-win
+    0       641.6      1281.2      1518.5        +99.7%       +18.5%
+    1       656.5      1285.6      1515.3        +95.8%       +17.9%
+    2       656.0      1287.4      1515.5        +96.3%       +17.7%
+    3       656.3      1285.1      1515.6        +95.8%       +17.9%
+  (exit=0)
+
+===== 3. compute-sanitizer memcheck (matmul kernels) =====
+
+$ compute-sanitizer --tool memcheck ./matmul_test 2>&1 | grep -E 'ERROR SUMMARY|invalid|leak|misaligned|out-of'
+========= ERROR SUMMARY: 0 errors
+  (exit=0)
+
+===== 4. compute-sanitizer synccheck (matmul __syncthreads barriers) =====
+
+$ compute-sanitizer --tool synccheck ./matmul_test 2>&1 | grep -E 'ERROR SUMMARY|barrier|divergent'
+========= ERROR SUMMARY: 0 errors
+  (exit=0)
+
+===== 5. compute-sanitizer memcheck (scanner kernel) =====
+
+$ compute-sanitizer --tool memcheck ./sha_test 2>&1 | grep -E 'ERROR SUMMARY|invalid|leak|misaligned|out-of'
+========= ERROR SUMMARY: 0 errors
+  (exit=0)
+
+===== 6. compute-sanitizer racecheck (matmul shared-mem tree-reduction) =====
+# BTX_VAL_NO_PERF=1 skips the timing loop: benchmarking under a sanitizer isn't representative
+# (instrumentation inflates and distorts timing), and its ~120 shared-mem kernel re-launches
+# would overrun racecheck's access-record tracker. racecheck then runs the full parity section,
+# exercising every kernel once including FusedOrig/FusedNew (the only kernels declaring __shared__).
+
+$ BTX_VAL_NO_PERF=1 compute-sanitizer --tool racecheck stdbuf -oL -eL ./matmul_test 2>&1 | grep -E 'RACECHECK SUMMARY|hazard|ALL PASS|returned an error'
+ALL PASS
+========= RACECHECK SUMMARY: 0 hazards displayed (0 errors, 0 warnings)
+  (exit=0)
+
+######################################################################
+# done
+######################################################################
