@@ -92,8 +92,9 @@ services:
       BTX_POOL_WORKER: ${BTX_POOL_WORKER:-MATADOR}
       # Upstream dev fee (1 slice in 100, ~1%). Set BTX_DEV_FEE=0 to keep all shares.
       BTX_DEV_FEE: ${BTX_DEV_FEE:-1}
-      # Batch size = the dominant throughput lever (more SM occupancy). Unset = auto
-      # (~2626 on 0.2.32). Tune up via BTX_BATCH; the 5090 has lots of VRAM headroom.
-      # 0.2.33's auto-sizer clamps to 1024 (slower) which is why we stay on 0.2.32. See bench/.
-      BTX_BATCH: ${BTX_BATCH:-}
+      # Batch size = the dominant throughput lever. Swept on the 5090: batch=32768 gives
+      # +107% over the 0.2.32 auto-pick (2626) at best nonces/watt (29.7k n/s/W, ~455W),
+      # within 4% of the raw peak (65536). VRAM is NOT the bound (~7GB of 32GB used). See
+      # bench/matador-batch-sweep.md. Override via BTX_BATCH (e.g. 65536 for peak raw rate).
+      BTX_BATCH: ${BTX_BATCH:-32768}
     # NO volumes: pool mode needs no wallet/chain data.
