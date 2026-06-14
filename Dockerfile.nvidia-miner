@@ -1,0 +1,66 @@
+# EXPERIMENTAL — third-party CUDA pool miner (thekillsquad007/btx-nvidia-miner).
+#
+# Why this exists: the official minebtx pool solver (btx-gbt-solve btx-prebuilds-v0.32.10)
+# regressed to ~3% GPU util after v3, and our solo node stalled at v3. This community
+# miner is v3-aware and targets the same minebtx pool, so it's a stopgap to keep the
+# 5090 productive on the pool until the official solver is fixed.
+#
+# TRUST: audited at commit df4e50e (read-only source review). No wallet/key access, no
+# exfiltration, no backdoor; its only network egress is the stratum pool you pass on the
+# CLI. Honest 1% dev fee (1 mining slice in 100 submits under the dev's worker; disable
+# with --dev-fee 0). We build FROM SOURCE at the pinned, reviewed commit — never the
+# unaudited prebuilt release binary the upstream install.sh defaults to.
+#
+# SANDBOX: no wallet/datadir/.ssh/cookie is ever mounted (pool mode needs only the
+# stratum socket + your payout address as a string). Runs as a non-root user. Pool-only
+# (upstream solo mode is an unimplemented stub).
+#
+# PERF NOTE: the miner's optimized kernels (windowed SHA, seed midstate, factored matmul)
+# are wired ONLY to its legacy pre-125000 path; the live v2/v3 batched path runs an
+# UNOPTIMIZED naive-w[64] SHA + full matmul. So expect it to WORK (saturate + land shares)
+# but not be fast until those opts are ported into the batched path. See the analysis.
+
+ARG CUDA_DEVEL_IMAGE=nvidia/cuda:12.8.0-devel-ubuntu24.04
+ARG CUDA_RUNTIME_IMAGE=nvidia/cuda:12.8.0-runtime-ubuntu24.04
+
+# ---------- Stage 1: build btx-miner from the pinned, audited commit ----------
+FROM ${CUDA_DEVEL_IMAGE} AS builder
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Pinned to the reviewed commit (HEAD of main at audit time). Bump ONLY after re-reviewing
+# the diff — a swapped commit is unaudited code.
+ARG MINER_REF=df4e50e1334a1109ef7045c0f6bea16b9fa2f69f
+# sm_120 = RTX 5090 (Blackwell).
+ARG CUDA_ARCHS=120
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      build-essential cmake git ca-certificates pkg-config libcurl4-openssl-dev \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /opt/miner-src
+RUN git init -q \
+ && git remote add origin https://github.com/thekillsquad007/btx-nvidia-miner.git \
+ && git fetch --depth 1 origin "${MINER_REF}" \
+ && git checkout -q FETCH_HEAD
+
+RUN cmake -B build \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DBTX_MINER_ENABLE_CUDA=ON \
+      -DBTX_MINER_BUILD_TESTS=OFF \
+      -DCMAKE_CUDA_ARCHITECTURES="${CUDA_ARCHS}" \
+ && cmake --build build -j"$(nproc)" --target btx-miner \
+ && strip --strip-unneeded build/btx-miner || true
+
+# ---------- Stage 2: lean runtime, non-root, no wallet ----------
+FROM ${CUDA_RUNTIME_IMAGE}
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      ca-certificates libcurl4 \
+ && rm -rf /var/lib/apt/lists/* \
+ && useradd -m -u 10001 miner
+
+COPY --from=builder /opt/miner-src/build/btx-miner /usr/local/bin/btx-miner
+COPY entrypoint-pool-nv.sh /usr/local/bin/entrypoint-pool-nv.sh
+RUN chmod +x /usr/local/bin/entrypoint-pool-nv.sh
+USER miner
+ENTRYPOINT ["/usr/local/bin/entrypoint-pool-nv.sh"]
