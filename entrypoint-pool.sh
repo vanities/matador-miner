@@ -24,9 +24,10 @@ POOL_HOST="${BTX_POOL_HOST:-minebtx.com}"
 POOL_PORT="${BTX_POOL_PORT:-3333}"
 WORKER="${BTX_POOL_WORKER:-$(hostname -s 2>/dev/null || echo rig)}"
 
-# Solver tuning — install.sh's fleet-wide NVIDIA defaults. The solver is
-# CPU-prep-gated, so solver_threads (not GPU batch) is the throughput lever:
-# nproc-4, clamped to [4,24]. gpu_inputs:0 + pipeline_async:1 match upstream.
+# Solver tuning. With BTX_MATMUL_GPU_INPUTS=1 (exported below, mandatory
+# post-block-125000) the solver is GPU-bound, so solver_threads is a minor lever
+# (12-24 within ~0.5% on a 5090); default nproc-4 clamped to [4,24], but
+# docker-compose pins BTX_SOLVER_THREADS=12.
 NPROC="$(nproc 2>/dev/null || echo 8)"
 THREADS="${BTX_SOLVER_THREADS:-$(( NPROC-4 < 4 ? 4 : (NPROC-4 > 24 ? 24 : NPROC-4) ))}"
 
@@ -58,6 +59,16 @@ YAML
 
 log "pool=${POOL_HOST}:${POOL_PORT}  worker=${WORKER}  backend=${BTX_SOLVER_BACKEND:-cuda}  threads=${THREADS}  gpu_inputs=${BTX_GPU_INPUTS:-0}"
 log "payout → ${ADDRESS}"
-log "NOTE: pool mode uses the pool's btx-gbt-solve (BTX v0.32.8; our PR#58 kernels now upstreamed), NOT our node solver."
+log "NOTE: pool mode uses the pool's btx-gbt-solve (BTX v0.32.10; our PR#58 kernels now upstreamed), NOT our node solver."
+
+# CRITICAL: btx-gbt-solve reads on-GPU input generation from the env var
+# BTX_MATMUL_GPU_INPUTS, NOT from the config's gpu_inputs key. dexbtx-miner v0.4.14's
+# DAEMON path stopped forwarding it (its gbt_solve_wrapper only sets the env when its
+# gpu_inputs field is non-None, which the daemon path leaves None; only the benchmark
+# path passes it). Without this export the solver defaults to CPU-side input gen and
+# STARVES a fast GPU (5090 sat at ~3% util / ~85W, ~0 shares). The wrapper copies
+# os.environ as its base env, so exporting here makes the solver subprocess inherit it.
+export BTX_MATMUL_GPU_INPUTS="${BTX_GPU_INPUTS:-1}"
+log "exported BTX_MATMUL_GPU_INPUTS=${BTX_GPU_INPUTS:-1} (the var the solver actually reads)"
 
 exec dexbtx-miner --config "$CONFIG"
