@@ -16,10 +16,11 @@
 # stratum socket + your payout address as a string). Runs as a non-root user. Pool-only
 # (upstream solo mode is an unimplemented stub).
 #
-# PERF NOTE: the miner's optimized kernels (windowed SHA, seed midstate, factored matmul)
-# are wired ONLY to its legacy pre-125000 path; the live v2/v3 batched path runs an
-# UNOPTIMIZED naive-w[64] SHA + full matmul. So expect it to WORK (saturate + land shares)
-# but not be fast until those opts are ported into the batched path. See the analysis.
+# PERF NOTE: pinned to 0.2.32 + patches-matador/ (windowed-SHA + seed-midstate port
+# into the LIVE batched matrix-gen, byte-exact, ~+3% on this fork). v0.2.33 was
+# benchmarked ~5% SLOWER on the 5090 (its auto-batch clamps to a 1024 floor vs 0.2.32's
+# 2626), so we stay on 0.2.32 for single-GPU; see bench/matador-benchmarks.md. The
+# dominant throughput lever is BATCH SIZE (tunable via BTX_BATCH; lots of VRAM headroom).
 
 ARG CUDA_DEVEL_IMAGE=nvidia/cuda:12.8.0-devel-ubuntu24.04
 ARG CUDA_RUNTIME_IMAGE=nvidia/cuda:12.8.0-runtime-ubuntu24.04
@@ -28,8 +29,9 @@ ARG CUDA_RUNTIME_IMAGE=nvidia/cuda:12.8.0-runtime-ubuntu24.04
 FROM ${CUDA_DEVEL_IMAGE} AS builder
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Pinned to the reviewed commit (HEAD of main at audit time). Bump ONLY after re-reviewing
-# the diff — a swapped commit is unaudited code.
+# Pinned to v0.2.32 (df4e50e, audited). v0.2.33 (9a7e50e) benchmarked ~5% slower on the
+# 5090 (auto-batch floor regression), so we stay here. Bump ONLY after re-reviewing +
+# benchmarking the diff; a swapped commit is unaudited code.
 ARG MINER_REF=df4e50e1334a1109ef7045c0f6bea16b9fa2f69f
 # sm_120 = RTX 5090 (Blackwell).
 ARG CUDA_ARCHS=120
@@ -43,6 +45,17 @@ RUN git init -q \
  && git remote add origin https://github.com/thekillsquad007/btx-nvidia-miner.git \
  && git fetch --depth 1 origin "${MINER_REF}" \
  && git checkout -q FETCH_HEAD
+
+# Our kernel optimizations on top of upstream. Applied with git apply so a future rev
+# that moves this code fails the build LOUDLY (signal to re-derive or drop). Each is
+# byte-exact validated (the miner's own CudaVerifyAgainstCpu) before deploy; see bench/.
+#   windowed-sha-matrixgen.patch: windowed w[16] SHA + per-seed midstate in the LIVE
+#   batched matrix-gen (gpu_sha256.cu), replacing the naive w[64] per-element recompute.
+ARG APPLY_MATADOR_PATCHES=1
+COPY patches-matador/ /opt/matador-patches/
+RUN if [ "${APPLY_MATADOR_PATCHES}" = "1" ]; then \
+      for p in /opt/matador-patches/*.patch; do echo "applying $p"; git apply --verbose "$p"; done; \
+    else echo "APPLY_MATADOR_PATCHES=0 - building stock upstream"; fi
 
 RUN cmake -B build \
       -DCMAKE_BUILD_TYPE=Release \
