@@ -29,8 +29,14 @@ WORKER="${BTX_POOL_WORKER:-$(hostname -s 2>/dev/null || echo rig)}"
 # BTX_DEV_FEE=0 to keep all shares. Default 1 as courtesy to the dev who filled the gap.
 DEV_FEE="${BTX_DEV_FEE:-1}"
 DEVICES="${BTX_DEVICES:-all}"
+# Batch size is the dominant throughput lever on a high-VRAM card: more in-flight work =
+# more SM occupancy. 0.2.32 auto-picks ~2626; set BTX_BATCH to tune it up (the 5090 has
+# lots of VRAM headroom). Unset = let the miner auto-size. See bench/matador-benchmarks.md.
+BATCH="${BTX_BATCH:-}"
+BATCH_ARG=""
+[ -n "$BATCH" ] && BATCH_ARG="--batch $BATCH"
 
-log "pool=${POOL_HOST}:${POOL_PORT}  worker=${WORKER}  devices=${DEVICES}  dev_fee=${DEV_FEE}%"
+log "pool=${POOL_HOST}:${POOL_PORT}  worker=${WORKER}  devices=${DEVICES}  dev_fee=${DEV_FEE}%  batch=${BATCH:-auto}"
 log "payout → ${ADDRESS}"
 log "NOTE: MATADOR (fork of thekillsquad007/btx-nvidia-miner), integrated stratum+CUDA, v3-aware."
 
@@ -41,4 +47,5 @@ exec btx-miner \
   --pass x \
   --devices "${DEVICES}" \
   --dev-fee "${DEV_FEE}" \
+  ${BATCH_ARG} \
   "$@"
