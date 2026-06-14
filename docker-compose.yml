@@ -3,13 +3,15 @@ services:
     build:
       context: .
       args:
-        # 0.32.8 compiled from source. Signed cuda13 prebuilts exist for releases,
+        # 0.32.9 compiled from source. Signed cuda13 prebuilts exist for releases,
         # but we compile by choice: it guarantees native sm_120 codegen for the
         # 5090 (the prebuilt's embedded archs are unverified) and yields a
-        # byte-reproducible build from a pinned tag commit. 0.32.8 = btx-node sync
-        # (recovery-exit/mempool/reorg hardening + CUDA solver perf); it UPSTREAMS
-        # our six PR #58 CUDA patches, so they're now disabled (APPLY_LOCAL_PATCHES=0).
-        BTX_SOURCE_REF: 9ce6774d27bf026c9673c1d39f196dc2ee144259
+        # byte-reproducible build from a pinned tag commit. 0.32.9 = btx-node sync:
+        # empty-block subsidy consensus rule at HEIGHT 130,000 + 25-tx template cap
+        # + reorg-parking + recovery-exit/mempool hardening. src/cuda untouched (only
+        # src/metal), so the solver is byte-identical to 0.32.8 and the build is stock
+        # (PR #58 patches stay upstreamed, APPLY_LOCAL_PATCHES=0).
+        BTX_SOURCE_REF: dddd2ee1945b987c4a51bf5bb64fae7fb9739c3f
         BTX_CUDA_ARCHITECTURES: "120"   # sm_120 = RTX 5090 (Blackwell)
         # Our six PR #58 CUDA patches were upstreamed into 0.32.8, so the local
         # patches are OFF by default now (APPLY_LOCAL_PATCHES=0 in the Dockerfile).
@@ -20,9 +22,9 @@ services:
     stop_grace_period: 120s        # give btxd time to flush cleanly on stop (entrypoint traps SIGTERM)
     gpus: all                      # requires nvidia-container-toolkit on the host
     environment:
-      # source  = run the 0.32.8 binaries compiled into the image (default).
+      # source  = run the 0.32.9 binaries compiled into the image (default).
       # release = download + GPG-verify the signed precompiled release instead;
-      #           for that, also set RELEASE_TAG=v0.32.8 here.
+      #           for that, also set RELEASE_TAG=v0.32.9 here.
       BTX_INSTALL_MODE: source
       BTX_MATMUL_BACKEND: cuda
       # 1 (default) = node + GPU mining (solo). 0 = NODE-ONLY: run btxd for the
