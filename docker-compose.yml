@@ -3,14 +3,17 @@ services:
     build:
       context: .
       args:
-        # 0.32.10 compiled from source. Signed cuda13 prebuilts exist for releases,
-        # but we compile by choice: it guarantees native sm_120 codegen for the
-        # 5090 (the prebuilt's embedded archs are unverified) and yields a
-        # byte-reproducible build from a pinned tag commit. 0.32.10 = btx-node sync:
-        # MatMul seed-derivation v3 consensus upgrade at HEIGHT 130,500 (+ preserves
-        # the 0.32.9 empty-block rule @130,000). v3 is in pow.cpp/chainparams; src/cuda
-        # untouched, so the stock build compiles v3 verbatim (APPLY_LOCAL_PATCHES=0).
-        BTX_SOURCE_REF: 33c79755e01465d933f0abba6bbba0e2dcbb207f
+        # 0.32.11 compiled from source (native sm_120 codegen for the 5090; byte-
+        # reproducible from a pinned tag commit). 0.32.11 = btx-node sync that HARDENS
+        # MatMul v3 parent-MTP seed handling across CPU/Metal/CUDA: GPU nonce prehash
+        # scanning now carries the active seed version + parent median-time-past, so the
+        # accelerated miner verifies the SAME seed scope as consensus. Fixes the v3 GPU
+        # solver stall we hit on 0.32.10 (its CUDA path didn't carry parent_mtp at height
+        # >=130,500). Keeps the 130,500 v3 binding + 130,000 empty-block rule; ADDS forward
+        # consensus at height 132,000 (velocity cap, empty-block penalty end, recovery-exit)
+        # - upgrade before 132,000. 0.32.11 itself touches src/cuda/oracle_accel.cu (the
+        # fix); our PR#58 patches stay OFF (already upstreamed; APPLY_LOCAL_PATCHES=0).
+        BTX_SOURCE_REF: 215170f27f7d6889ce34aa7dbba2858ea07a468c
         BTX_CUDA_ARCHITECTURES: "120"   # sm_120 = RTX 5090 (Blackwell)
         # Our six PR #58 CUDA patches were upstreamed into 0.32.8, so the local
         # patches are OFF by default now (APPLY_LOCAL_PATCHES=0 in the Dockerfile).

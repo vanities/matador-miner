@@ -13,7 +13,7 @@ CLI  = $(COMPOSE) exec -T $(SVC) btx-cli -datadir=$(DATADIR)
 WCLI = $(CLI) -rpcwallet=$(WALLET)
 
 .DEFAULT_GOAL := help
-.PHONY: help up down restart logs stats status balance address gpu bench pool matador solo pool-logs matador-logs shell cli backup restore reset clean
+.PHONY: help up down restart logs stats status balance address gpu bench pool matador solo deploy pool-logs matador-logs shell cli backup restore reset clean
 
 # Payout address for pool mode — pulled from address.txt (gitignored) so it
 # never lands in a committed file. The first btx1... line wins.
@@ -84,6 +84,24 @@ solo: ## Switch back to SOLO mining (our patched node) — stops pool
 	@echo "Starting SOLO miner..."
 	@$(COMPOSE) up -d $(SVC)
 	@echo "Solo mining (our optimized solver)."
+
+deploy: ## Minimal-downtime version bump: build new image WHILE mining continues, then swap + time the warmup gap
+	@echo "[deploy] building $(SVC) (the running miner keeps mining during the build)..."
+	@$(COMPOSE) build $(SVC)
+	@echo "[deploy] build OK. Stopping any pool-side miner, then swapping solo to the new image..."
+	@$(COMPOSE) --profile pool stop btx-pool 2>/dev/null || true
+	@$(COMPOSE) --profile matador stop matador 2>/dev/null || true
+	@t0=$$(date +%s); $(COMPOSE) up -d $(SVC); \
+	  echo "[deploy] swapped; waiting for mining to resume (warmup = shielded state + sync catch-up)..."; \
+	  for i in $$(seq 1 90); do \
+	    sleep 10; \
+	    N=$$($(CLI) getmatmulchallengeprofile 2>/dev/null | jq -r '.service_profile.runtime_observability.solve_pipeline.batched_nonce_attempts // 0' 2>/dev/null | tr -dc 0-9); \
+	    if [ -n "$$N" ] && [ "$$N" -gt 0 ] 2>/dev/null; then \
+	      echo "[deploy] mining RESUMED after $$(($$(date +%s)-t0))s (solve counter=$$N) - that gap is the real downtime"; break; \
+	    fi; \
+	    echo "[deploy]   ...warming $$(($$(date +%s)-t0))s"; \
+	  done; \
+	  echo "[deploy] if this gap recurs on every bump (not just the one-time 0.32.11 rebuild), see docs/minimal-downtime-deploy.md"
 
 node: ## Run the node ONLY (wallet + RPC, no mining, no GPU compute) — start alongside the pool so balance/stats/status work while pooling
 	@echo "Starting NODE-ONLY btxd: wallet + RPC, no mining, no GPU compute."
