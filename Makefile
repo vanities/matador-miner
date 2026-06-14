@@ -13,7 +13,7 @@ CLI  = $(COMPOSE) exec -T $(SVC) btx-cli -datadir=$(DATADIR)
 WCLI = $(CLI) -rpcwallet=$(WALLET)
 
 .DEFAULT_GOAL := help
-.PHONY: help up down restart logs stats status balance address gpu bench pool solo pool-logs shell cli backup restore reset clean
+.PHONY: help up down restart logs stats status balance address gpu bench pool pool-nv solo pool-logs pool-nv-logs shell cli backup restore reset clean
 
 # Payout address for pool mode — pulled from address.txt (gitignored) so it
 # never lands in a committed file. The first btx1... line wins.
@@ -68,9 +68,19 @@ pool: ## Switch to POOL mining (minebtx) — stops solo. Pool's solver is SLOWER
 	@BTX_PAYOUT_ADDRESS=$(POOL_ADDR) $(COMPOSE) --profile pool up -d --build btx-pool
 	@echo "Pool mining. Logs: make pool-logs   ·   Back to solo: make solo"
 
+pool-nv: ## Switch to the CUSTOM NVIDIA pool miner (our optimizable fork) — saturates the 5090, stops solo + official pool
+	@test -n "$(POOL_ADDR)" || { echo "No btx1... payout address in address.txt — add one first."; exit 1; }
+	@echo "Payouts will go to: $(POOL_ADDR)"
+	@echo "Stopping solo + official pool (one miner owns the GPU)..."
+	@$(COMPOSE) stop $(SVC) btx-pool 2>/dev/null || true
+	@echo "Building + starting the custom NVIDIA pool miner..."
+	@BTX_PAYOUT_ADDRESS=$(POOL_ADDR) $(COMPOSE) --profile pool-nv up -d --build btx-pool-nv
+	@echo "NVIDIA pool mining. Logs: make pool-nv-logs   ·   Back to solo: make solo"
+
 solo: ## Switch back to SOLO mining (our patched node) — stops pool
-	@echo "Stopping POOL miner..."
+	@echo "Stopping POOL miners..."
 	@$(COMPOSE) --profile pool stop btx-pool 2>/dev/null || true
+	@$(COMPOSE) --profile pool-nv stop btx-pool-nv 2>/dev/null || true
 	@echo "Starting SOLO miner..."
 	@$(COMPOSE) up -d $(SVC)
 	@echo "Solo mining (our optimized solver)."
@@ -85,6 +95,9 @@ node: ## Run the node ONLY (wallet + RPC, no mining, no GPU compute) — start a
 
 pool-logs: ## Follow the pool miner logs
 	@$(COMPOSE) logs -f btx-pool
+
+pool-nv-logs: ## Follow the custom NVIDIA pool miner logs
+	@$(COMPOSE) logs -f btx-pool-nv
 
 shell: ## Open a shell inside the miner container
 	$(COMPOSE) exec $(SVC) bash

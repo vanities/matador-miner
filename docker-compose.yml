@@ -69,3 +69,27 @@ services:
       BTX_GPU_INPUTS: ${BTX_GPU_INPUTS:-1}
     # NO volumes: the pool client needs no wallet/chain data — payout is to a
     # public address, so no keys are mounted into the third-party solver.
+
+  # CUSTOM NVIDIA pool miner (our fork of thekillsquad007/btx-nvidia-miner): an
+  # integrated stratum+CUDA binary that saturates the 5090 (~86-95%) and lands valid
+  # v3 shares, unlike the official btx-gbt-solve which regressed to ~3% util after v3.
+  # Built from source at a pinned, audited commit (Dockerfile.nvidia-miner). Started
+  # only via `make pool-nv`. Sandboxed: non-root, NO wallet/datadir mount, egress is
+  # the stratum pool only (audited). Our kernel optimizations apply as build patches.
+  btx-pool-nv:
+    profiles: ["pool-nv"]
+    build:
+      context: .
+      dockerfile: Dockerfile.nvidia-miner
+    image: btx-nvidia-miner:local
+    container_name: btx-pool-nv
+    restart: unless-stopped
+    gpus: all                      # contends with btx-miner/btx-pool — run one at a time
+    environment:
+      BTX_PAYOUT_ADDRESS: ${BTX_PAYOUT_ADDRESS:-}
+      BTX_POOL_HOST: stratum.minebtx.com
+      BTX_POOL_PORT: "3333"
+      BTX_POOL_WORKER: ${BTX_POOL_WORKER:-KINGNV}
+      # Upstream dev fee (1 slice in 100, ~1%). Set BTX_DEV_FEE=0 to keep all shares.
+      BTX_DEV_FEE: ${BTX_DEV_FEE:-1}
+    # NO volumes: pool mode needs no wallet/chain data.
