@@ -1,5 +1,10 @@
 # btx-miner — isolated GPU solo-miner for `btxchain/btx`
 
+![MATADOR — fearless BTX MatMul miner](docs/matador.png)
+
+> **MATADOR** is this repo's custom CUDA pool miner (`make matador`) — an integrated
+> stratum + CUDA binary that saturates the GPU on the minebtx pool with valid v3 shares.
+
 A Docker setup to point an idle NVIDIA GPU (e.g. an RTX 5090) at the
 `btxchain/btx` chain and see whether it can mine a block while keeping the node,
 miner, and wallet data isolated from the host.
