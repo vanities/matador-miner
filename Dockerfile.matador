@@ -1,4 +1,5 @@
-# EXPERIMENTAL — third-party CUDA pool miner (thekillsquad007/btx-nvidia-miner).
+# MATADOR — our BTX MatMul pool miner (fork of thekillsquad007/btx-nvidia-miner).
+# MAT(mul) + matador: faces the bull (the 512x512 M31 matmul PoW) with precision.
 #
 # Why this exists: the official minebtx pool solver (btx-gbt-solve btx-prebuilds-v0.32.10)
 # regressed to ~3% GPU util after v3, and our solo node stalled at v3. This community
@@ -60,7 +61,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
  && useradd -m -u 10001 miner
 
 COPY --from=builder /opt/miner-src/build/btx-miner /usr/local/bin/btx-miner
-COPY entrypoint-pool-nv.sh /usr/local/bin/entrypoint-pool-nv.sh
-RUN chmod +x /usr/local/bin/entrypoint-pool-nv.sh
+COPY entrypoint-matador.sh /usr/local/bin/entrypoint-matador.sh
+RUN chmod +x /usr/local/bin/entrypoint-matador.sh
 USER miner
-ENTRYPOINT ["/usr/local/bin/entrypoint-pool-nv.sh"]
+ENTRYPOINT ["/usr/local/bin/entrypoint-matador.sh"]
