@@ -1,27 +1,24 @@
 # Isolated BTX GPU solo-miner — COMPILES btxchain/btx from source.
 #
-# Pinned to the v0.32.9 tag commit, compiled WITH the CUDA MatMul backend.
+# Pinned to the v0.32.10 tag commit, compiled WITH the CUDA MatMul backend.
 # Upstream ships GPG-signed cuda13 prebuilts for tagged releases, but we compile
 # by choice: it guarantees native sm_120 codegen for the RTX 5090 (the prebuilt's
 # embedded archs are unverified) and yields a byte-reproducible build from an
 # immutable SHA. To run the signed prebuilt instead, set BTX_INSTALL_MODE=release
-# + RELEASE_TAG=v0.32.9 in docker-compose.yml (the entrypoint keeps that path).
+# + RELEASE_TAG=v0.32.10 in docker-compose.yml (the entrypoint keeps that path).
 #
-# 0.32.9 is a btx-node sync point release (tag cut 2026-06-13). It adds an
-# empty-block subsidy CONSENSUS rule at HEIGHT 130,000: a consecutive empty
-# coinbase-only block may claim at most 50% of the scheduled subsidy (25% for the
-# 2nd and later); claiming more is invalid. Plus a 25-tx default template cap
-# (fast non-empty path), reorg-parking defaults (warn >3 / park >12 blocks), and
-# recovery-exit/mempool/wallet hardening. It does NOT change MatMul consensus
-# (seed/digest/verify) and does NOT touch src/cuda/ (only src/metal), so the CUDA
-# solver is byte-identical to 0.32.8 and the build stays stock. Because we mine
-# SOLO, being on 0.32.9 before height 130,000 avoids producing empty blocks the
-# upgraded network would reject. (0.32.8 upstreamed our six PR #58 CUDA patches
-# into src/cuda/, so APPLY_LOCAL_PATCHES=0; they carry as upstream through 0.32.9.
-# 0.32.7 = validation/chainparams/miner/mempool + assumeutxo; 0.32.6 shielded
-# recovery-exit + block-128,000 cleanup; 0.32.5 Metal-only; 0.32.4 operator-safety;
-# 0.32.3 on-GPU pre-hash scanner; 0.32.2 block-125,000 shielded-sunset +
-# nonce-seed-v2 fork, 2026-06-08.)
+# 0.32.10 is a btx-node sync point release (tag cut 2026-06-14). It adds a MatMul
+# SEED-DERIVATION v3 CONSENSUS upgrade at HEIGHT 130,500 (the v2 seed binds more
+# chain data; nodes/miners/pools/services must upgrade before 130,500) and
+# PRESERVES the 0.32.9 empty-block subsidy rule at height 130,000. The v3 change
+# lives in pow.cpp + chainparams/validation; src/cuda/ is UNTOUCHED, so the stock
+# build compiles the official v3 logic verbatim and stays consensus-correct
+# (APPLY_LOCAL_PATCHES=0; our PR #58 kernels remain upstreamed). (0.32.9 = the
+# empty-block subsidy rule @130,000 + 25-tx template cap + reorg-parking; 0.32.8
+# upstreamed our six PR #58 CUDA patches; 0.32.7 = validation/chainparams/miner/
+# mempool + assumeutxo; 0.32.6 shielded recovery-exit + block-128,000 cleanup;
+# 0.32.5 Metal-only; 0.32.4 operator-safety; 0.32.3 on-GPU pre-hash scanner; 0.32.2
+# block-125,000 shielded-sunset + nonce-seed-v2 fork, 2026-06-08.)
 #
 # Trust boundary note: the release signing key is integrity-only (self-published
 # with the release, nobody independent vouches — see entrypoint.sh), so a pinned
@@ -40,9 +37,9 @@ ARG CUDA_RUNTIME_IMAGE=nvidia/cuda:13.0.0-runtime-ubuntu24.04
 FROM ${CUDA_DEVEL_IMAGE} AS builder
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Exact upstream commit to compile. dddd2ee1 = the v0.32.9 release tag commit. An
+# Exact upstream commit to compile. 33c79755 = the v0.32.10 release tag commit. An
 # immutable SHA means every rebuild on every box produces a byte-identical tree.
-ARG BTX_SOURCE_REF=dddd2ee1945b987c4a51bf5bb64fae7fb9739c3f
+ARG BTX_SOURCE_REF=33c79755e01465d933f0abba6bbba0e2dcbb207f
 # sm_120 = NVIDIA Blackwell (RTX 5090). Other GPUs: Ada=89, Hopper=90, Ampere=80/86.
 ARG BTX_CUDA_ARCHITECTURES=120
 
@@ -114,7 +111,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       libboost-system1.83.0 libboost-filesystem1.83.0 libboost-program-options1.83.0 \
  && rm -rf /var/lib/apt/lists/*
 
-# Compiled 0.32.9 binaries (btxd, btx-cli, btx-matmul-*) + the contrib/ scripts
+# Compiled 0.32.10 binaries (btxd, btx-cli, btx-matmul-*) + the contrib/ scripts
 # the entrypoint drives at run time (mining loop; faststart for release mode).
 COPY --from=builder /opt/btx-src/build/bin/ /opt/btx/bin/
 COPY --from=builder /opt/btx-src/contrib/   /opt/btx-src/contrib/

@@ -65,7 +65,7 @@ make solo     # switch back to solo
 make pool-logs
 ```
 
-Trade-off: pool mode runs the pool's own `btx-gbt-solve` (BTX v0.32.8,
+Trade-off: pool mode runs the pool's own `btx-gbt-solve` (BTX v0.32.10,
 SHA256-verified at build). The pool **adopted our PR#58 GPU kernel
 optimizations** (now upstreamed into BTX itself), so it's roughly comparable to our solo solver rather
 than the ~3× sacrifice the old 0.32.2 build was — pool mode now trades just the
