@@ -129,6 +129,14 @@ addnode=216.243.220.55:19335
 addnode=178.128.156.73:19335
 addnode=46.101.240.240:19335
 addnode=79.127.128.100:19335
+# Verified-good additions (2026-06-13): each was connected + synced + full-relay at
+# harvest time, from our own getpeerinfo plus an addrman onetry sweep (most reachable
+# synced nodes were already seeded above; the BTX reachable-node pool is small).
+# Refresh from `getpeerinfo` (filter /BTX:0.32.x/ + synced + relaytxes=true) when stale.
+addnode=86.217.243.230:19335
+addnode=88.147.5.121:19335
+addnode=62.238.22.167:19335
+addnode=1.156.5.90:19335
 CONF
 fi
 
