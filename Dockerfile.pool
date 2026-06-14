@@ -24,13 +24,13 @@ ARG CUDA_RUNTIME_IMAGE=nvidia/cuda:12.8.0-runtime-ubuntu24.04
 FROM ${CUDA_RUNTIME_IMAGE}
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Pins for the current minebtx release (matched pair: package v0.4.13 targets the
-# btx-prebuilds-v0.32.8 solver). SOLVER_SHA256 verified by download 2026-06-13.
+# Pins for the current minebtx release (matched pair: package v0.4.14 targets the
+# btx-prebuilds-v0.32.10 solver). SOLVER_SHA256 verified by download 2026-06-14.
 #   - dexbtx-miner Python package (the stratum orchestrator + C4 job feeding)
-#   - btx-gbt-solve x86_64 CUDA solver (BTX v0.32.8; PR#58 now upstreamed) + SHA256
-ARG DEXBTX_MINER_PKG_URL=https://github.com/dexbtx/minebtx/archive/refs/tags/v0.4.13.tar.gz
-ARG SOLVER_URL=https://github.com/dexbtx/minebtx/releases/download/btx-prebuilds-v0.32.8/btx-gbt-solve
-ARG SOLVER_SHA256=50ec2e4ecd685c7e0e1199746405ee0bd94bc70a40f63bd1fa7989992a89b799
+#   - btx-gbt-solve x86_64 CUDA solver (BTX v0.32.10; seed-deriv v3 @130,500) + SHA256
+ARG DEXBTX_MINER_PKG_URL=https://github.com/dexbtx/minebtx/archive/refs/tags/v0.4.14.tar.gz
+ARG SOLVER_URL=https://github.com/dexbtx/minebtx/releases/download/btx-prebuilds-v0.32.10/btx-gbt-solve
+ARG SOLVER_SHA256=2c93d27cb1b0060f038ec40e8f34e9f1c0faa09c97cffaaea062d548aea59141
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
       python3 python3-pip curl ca-certificates \
