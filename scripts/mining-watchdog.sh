@@ -138,6 +138,8 @@ while :; do
   if [ $((cyc % 10)) -eq 0 ]; then
     kalive="$(pgrep -f empty-block-keeper.sh >/dev/null 2>&1 && echo yes || echo NO)"
     [ "$kalive" = "NO" ] && [ "$H" -lt 132000 ] 2>/dev/null && alert "WARN" "empty-block keeper not running while still in penalty window (h=$H<132000)"
-    log "ok h=$H/$HD ibd=$IBD paused=$paused idle_gated=$idle_gated solve+=$d gpu=${gpu}% near_tip_peers=$ntp keeper=$kalive restarts=$restarts"
+    # btxd continuous uptime = node trust / propagation "social credit" (resets on restart).
+    up="$("${CLI[@]}" uptime 2>/dev/null | tr -dc 0-9)"; up="${up:-0}"
+    log "ok h=$H/$HD ibd=$IBD paused=$paused idle_gated=$idle_gated solve+=$d gpu=${gpu}% near_tip_peers=$ntp keeper=$kalive uptime=$((up/3600))h$(((up%3600)/60))m restarts=$restarts"
   fi
 done
