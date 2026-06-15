@@ -242,6 +242,13 @@ graceful_stop() {
 trap graceful_stop TERM INT
 
 log "Starting GPU mining loop (generatetoaddress via CUDA). 'docker compose down' stops cleanly now."
+# Idle gate: pause GPU mining WITHOUT restarting btxd (no shielded-state warmup).
+#   Stop the miner:  docker compose exec btx-miner touch /data/.pause-mining   (or: make stop-miner)
+#   Resume:          docker compose exec btx-miner rm   /data/.pause-mining    (or: make start-miner)
+# NOTE: keep these comments ABOVE the command. A comment line wedged between
+# backslash line-continuations merges into the previous line, so its `#` would
+# comment out every following arg (e.g. --should-mine-command) AND the trailing
+# `&` — silently disabling the idle gate and breaking LOOP_PID/clean shutdown.
 "$SRC/contrib/mining/live-mining-loop.sh" \
   --datadir="$DATADIR" \
   --wallet="$WALLET" \
@@ -249,9 +256,6 @@ log "Starting GPU mining loop (generatetoaddress via CUDA). 'docker compose down
   --results-dir="$DATADIR/mining-ops" \
   --daemon="$BTXD" \
   --cli="$CLI" \
-  # Idle gate: pause GPU mining WITHOUT restarting btxd (no shielded-state warmup).
-  # Stop the miner:  docker compose exec btx-miner touch /data/.pause-mining   (or: make stop-miner)
-  # Resume:          docker compose exec btx-miner rm   /data/.pause-mining    (or: make start-miner)
   --should-mine-command="test ! -f $DATADIR/.pause-mining" &
 LOOP_PID=$!
 wait "$LOOP_PID"

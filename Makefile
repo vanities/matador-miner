@@ -59,31 +59,36 @@ gpu: ## GPU utilization / power / temp (host nvidia-smi)
 bench: ## A/B the solver across images in v2 (live-representative) mode; pauses miner
 	@bash bench/ab.sh
 
-pool: ## Switch to POOL mining (minebtx v0.4.16/v0.32.11). Stops solo; trades a 2.5% fee for steady payouts (solo's overlap still edges it)
+pool: ## Switch to POOL mining (minebtx v0.4.16/v0.32.11). PAUSES solo's GPU mining but keeps the node UP (no warmup); 2.5% fee for steady payouts
 	@test -n "$(POOL_ADDR)" || { echo "No btx1... payout address in address.txt — add one first."; exit 1; }
 	@echo "Payouts will go to: $(POOL_ADDR)"
-	@echo "Stopping SOLO miner (solo and pool can't share the GPU)..."
-	@$(COMPOSE) stop $(SVC) 2>/dev/null || true
+	@echo "Pausing SOLO GPU mining via the idle gate — btxd stays UP (wallet/RPC/stats keep working,"
+	@echo "no shielded-state warmup); this frees the GPU for the pool. Pause lands within ~1-2 min."
+	@$(COMPOSE) exec -T $(SVC) touch $(DATADIR)/.pause-mining 2>/dev/null \
+	  || echo "  (solo container not running — nothing to pause)"
 	@echo "Building + starting POOL miner..."
 	@BTX_PAYOUT_ADDRESS=$(POOL_ADDR) $(COMPOSE) --profile pool up -d --build btx-pool
-	@echo "Pool mining. Logs: make pool-logs   ·   Back to solo: make solo"
+	@echo "Pool mining; solo node still UP with mining paused. Logs: make pool-logs   ·   Back to solo: make solo"
 
-matador: ## Switch to MATADOR — our fast custom pool miner (saturates the 5090), stops solo + official pool
+matador: ## Switch to MATADOR — our custom pool miner. PAUSES solo's GPU mining but keeps the node UP; stops official pool
 	@test -n "$(POOL_ADDR)" || { echo "No btx1... payout address in address.txt — add one first."; exit 1; }
 	@echo "Payouts will go to: $(POOL_ADDR)"
-	@echo "Stopping solo + official pool (one miner owns the GPU)..."
-	@$(COMPOSE) stop $(SVC) btx-pool 2>/dev/null || true
+	@echo "Pausing SOLO GPU mining via the idle gate (btxd stays UP, no warmup) + stopping official pool..."
+	@$(COMPOSE) exec -T $(SVC) touch $(DATADIR)/.pause-mining 2>/dev/null \
+	  || echo "  (solo container not running — nothing to pause)"
+	@$(COMPOSE) --profile pool stop btx-pool 2>/dev/null || true
 	@echo "Building + starting MATADOR..."
 	@BTX_PAYOUT_ADDRESS=$(POOL_ADDR) $(COMPOSE) --profile matador up -d --build matador
-	@echo "MATADOR mining (olé). Logs: make matador-logs   ·   Back to solo: make solo"
+	@echo "MATADOR mining (olé); solo node still UP with mining paused. Logs: make matador-logs   ·   Back to solo: make solo"
 
-solo: ## Switch back to SOLO mining (our patched node) — stops pool
-	@echo "Stopping POOL miners..."
+solo: ## Switch back to SOLO mining — stops pool, then resumes solo GPU mining (no node restart if it was only paused)
+	@echo "Stopping POOL miners (freeing the GPU)..."
 	@$(COMPOSE) --profile pool stop btx-pool 2>/dev/null || true
 	@$(COMPOSE) --profile matador stop matador 2>/dev/null || true
-	@echo "Starting SOLO miner..."
+	@echo "Ensuring solo node is up, then resuming GPU mining (clearing the idle-gate flag)..."
 	@$(COMPOSE) up -d $(SVC)
-	@echo "Solo mining (our optimized solver)."
+	@$(COMPOSE) exec -T $(SVC) rm -f $(DATADIR)/.pause-mining 2>/dev/null || true
+	@echo "Solo mining. If the node was only paused (not stopped), there's no warmup."
 
 stop-miner: ## Pause GPU mining (idle gate) - keeps btxd + node synced + keeper alive, NO warmup
 	@$(COMPOSE) exec -T $(SVC) touch $(DATADIR)/.pause-mining && echo "Miner paused; node stays up. Resume: make start-miner"
