@@ -18,6 +18,7 @@ q() { btx-cli -datadir=/data "\$@"; }
 q -rpcwallet=$WALLET getwalletinfo 2>/dev/null | jq -r '"balance   : \(.balance) + \(.immature_balance) immature = \(.balance + .immature_balance) BTX   (\(.txcount) txns)"'
 q getblockchaininfo 2>/dev/null | jq -r '"height    : \(.blocks) / \(.headers)   IBD=\(.initialblockdownload)"'
 q getmininginfo 2>/dev/null | jq -r '"difficulty: \(.difficulty)\nnet h/s   : \(.networkhashps|floor)\nmining    : paused=\(.chain_guard.should_pause_mining)  \(.chain_guard.reason)  peers=\(.chain_guard.peer_count)  near_tip=\(.chain_guard.near_tip_peers)"'
+q uptime 2>/dev/null | jq -r '"uptime    : \(./3600|floor)h \((. % 3600)/60|floor)m continuous  (node trust/propagation builds with uptime; every restart resets it)"'
 EOF
 fi
 
