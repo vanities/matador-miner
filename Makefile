@@ -59,7 +59,7 @@ gpu: ## GPU utilization / power / temp (host nvidia-smi)
 bench: ## A/B the solver across images in v2 (live-representative) mode; pauses miner
 	@bash bench/ab.sh
 
-pool: ## Switch to POOL mining (minebtx) — stops solo. Pool's solver is SLOWER than solo; trades speed for steady payouts
+pool: ## Switch to POOL mining (minebtx v0.4.16/v0.32.11). Stops solo; trades a 2.5% fee for steady payouts (solo's overlap still edges it)
 	@test -n "$(POOL_ADDR)" || { echo "No btx1... payout address in address.txt — add one first."; exit 1; }
 	@echo "Payouts will go to: $(POOL_ADDR)"
 	@echo "Stopping SOLO miner (solo and pool can't share the GPU)..."

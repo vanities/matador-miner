@@ -51,9 +51,9 @@ services:
   # so plain `docker compose up -d` (and `make up`) NEVER starts it — only
   # `make pool` does. Solo and pool can't run at once (they'd fight over the GPU),
   # so the make targets stop one before starting the other. Pool mode uses the
-  # pool's own btx-gbt-solve (BTX v0.32.10 — ships our PR#58 kernels, now upstreamed,
-  # so it's roughly comparable to solo) and trades a 2.5% fee for steady PPLNS payouts.
-  # See Dockerfile.pool for the trust note.
+  # pool's own btx-gbt-solve (now BTX v0.32.11, the v3 GPU-scan fix: saturates the
+  # card, comparable to solo minus our overlap patch) and trades a 2.5% fee for
+  # steady PPLNS payouts. See Dockerfile.pool for the version pins + trust note.
   btx-pool:
     profiles: ["pool"]             # opt-in: started only via `make pool`
     build:
@@ -84,10 +84,12 @@ services:
 
   # MATADOR — our BTX MatMul pool miner (fork of thekillsquad007/btx-nvidia-miner): an
   # integrated stratum+CUDA binary that saturates the 5090 (~86-95%) and lands valid
-  # v3 shares, unlike the official btx-gbt-solve which regressed to ~3% util after v3.
-  # Built from source at a pinned, audited commit (Dockerfile.matador). Started only
-  # via `make matador`. Sandboxed: non-root, NO wallet/datadir mount, egress is the
-  # stratum pool only (audited). Our kernel optimizations apply as build patches.
+  # v3 shares. NOTE: now largely SUPERSEDED. The official btx-gbt-solve's ~3% util was
+  # the v0.32.10 build; btx-prebuilds-v0.32.11 fixed the v3 GPU-scan, so `make pool`
+  # (bumped to v0.4.16/v0.32.11) is again effective and is the preferred pool path.
+  # MATADOR stays as a fallback + proof our shares are accepted. Built from a pinned,
+  # audited commit (Dockerfile.matador). Started only via `make matador`. Sandboxed:
+  # non-root, NO wallet/datadir mount, egress is the stratum pool only (audited).
   matador:
     profiles: ["matador"]
     build:
