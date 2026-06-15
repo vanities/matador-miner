@@ -58,6 +58,48 @@ keeps this short - see [Fast-start](#fast-start--snapshot-0321), prints **your**
 mining address, and starts a supervised solo-mining loop. Rebuilds reuse Docker's
 layer cache, so nothing recompiles unless you change `BTX_SOURCE_REF`.
 
+## Install the prebuilt miner (`matador-miner`)
+
+Prefer a single binary over the Docker stack? `matador-miner` is a **standalone solo GPU
+miner**: it pulls work from **your own `btxd`** via `getblocktemplate`, solves on the GPU
+(our +22.9% overlap is baked in), and submits with `submitblock`. It is **decoupled from
+the node**, so updating the miner never restarts `btxd` (no shielded-state warmup, no lost
+propagation standing). Linux x86-64, NVIDIA Blackwell `sm_120` (RTX 5090).
+
+**Copy/paste installer** (downloads the latest release, verifies the sha256, installs to
+`/usr/local/bin`):
+
+```bash
+# matador-miner — latest release, checksum-verified
+api=https://api.github.com/repos/vanities/matador-miner/releases/latest
+url=$(curl -fsSL "$api" | grep -oE '"browser_download_url": *"[^"]+linux-x86_64"' | cut -d'"' -f4)
+curl -fsSLO "$url" && curl -fsSLO "$url.sha256"          # binary + checksum
+sha256sum -c "$(basename "$url").sha256"                 # must print: OK
+chmod +x "$(basename "$url")"
+sudo mv "$(basename "$url")" /usr/local/bin/matador-miner
+matador-miner --help
+```
+
+**Run it** against a synced `btxd` (this repo's `make node`, or any `btxd` v0.32.11+ with
+RPC enabled):
+
+```bash
+matador-miner \
+  --chain main \
+  --payoutaddress btx1...your-P2MR-address \   # getnewaddress from a current btx wallet
+  --rpccookiefile ~/.btx/.cookie               # or --rpcuser/--rpcpassword
+# extras: --rpcconnect 127.0.0.1 --rpcport 19334 --maxtries N
+#         --dev-fee 1 (default; 0 disables)  --dev-address <addr>  LOG_LEVEL=debug
+```
+
+- **Solo + your keys only.** It submits to *your* `btxd` over **localhost RPC** and holds
+  **no wallet keys**; mined coins pay the `--payoutaddress` you provide.
+- **1% dev fee, time-based + transparent.** Like Claymore/PhoenixMiner/T-Rex, it points the
+  coinbase at the dev address for ~1% of wall-clock time (~36s/hr) and **logs every
+  entry/exit** of that window. Turn it off with `--dev-fee 0`.
+- Closed-source binary (AM2 LLC); **verify the sha256** before running. `LOG_LEVEL=debug`
+  for full per-stage solve timing, every template, every submit (accept/reject + reason).
+
 ## Why solo
 
 You run your own node + our CUDA solver, keep 100% of every block (no fee), saturate the
