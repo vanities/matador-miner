@@ -66,17 +66,23 @@ miner**: it pulls work from **your own `btxd`** via `getblocktemplate`, solves o
 the node**, so updating the miner never restarts `btxd` (no shielded-state warmup, no lost
 propagation standing). Linux x86-64, NVIDIA Blackwell `sm_120` (RTX 5090).
 
-**Copy/paste installer** (downloads the latest release, verifies the sha256, installs to
+**One-line install** (downloads the latest release, verifies the sha256, installs to
 `/usr/local/bin`):
 
 ```bash
-# matador-miner — latest release, checksum-verified
+curl -fsSL https://raw.githubusercontent.com/vanities/matador-miner/main/install.sh | bash
+```
+
+Pin a version or change the install dir with env vars:
+`VERSION=v0.1.0 PREFIX=$HOME/.local/bin` before the pipe. Prefer to inspect first? Read
+[`install.sh`](install.sh), or do it by hand:
+
+```bash
 api=https://api.github.com/repos/vanities/matador-miner/releases/latest
 url=$(curl -fsSL "$api" | grep -oE '"browser_download_url": *"[^"]+linux-x86_64"' | cut -d'"' -f4)
 curl -fsSLO "$url" && curl -fsSLO "$url.sha256"          # binary + checksum
 sha256sum -c "$(basename "$url").sha256"                 # must print: OK
-chmod +x "$(basename "$url")"
-sudo mv "$(basename "$url")" /usr/local/bin/matador-miner
+chmod +x "$(basename "$url")" && sudo mv "$(basename "$url")" /usr/local/bin/matador-miner
 matador-miner --help
 ```
 
