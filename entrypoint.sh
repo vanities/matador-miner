@@ -137,6 +137,11 @@ addnode=86.217.243.230:19335
 addnode=88.147.5.121:19335
 addnode=62.238.22.167:19335
 addnode=1.156.5.90:19335
+# Verified-good (2026-06-15): connected + synced within 2 of tip + full-relay at
+# harvest time. Added after a post-restart stale-peer partition (the node sat at a
+# doomed stale tip with near_tip_peers=0 while the canonical chain advanced); the
+# other 5 currently-synced anchors were already seeded above.
+addnode=43.167.159.17:19335
 CONF
 fi
 
