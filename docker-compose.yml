@@ -34,6 +34,14 @@ services:
       # let `make balance`/`make stats` work while pooling. `make node` sets this 0;
       # `make solo` leaves it at the default 1. See entrypoint.sh step 5d.
       BTX_MINING_ENABLED: ${BTX_MINING_ENABLED:-1}
+      # Provisioning RPC-startup wait (×2s each). The full shielded-state rebuild
+      # (genesis replay, ~9-15min, slower under host load) must finish within this
+      # window or the entrypoint gives up, btxd is killed mid-rebuild, and the
+      # container restart-loops forever (each restart replays from scratch). The
+      # loop breaks the instant RPC is up, so a generous ceiling is free. 1800×2s
+      # = ~60min. (Bumped from the old 300/10min, which was too tight for the v3
+      # double-rebuild and caused a restart loop on 2026-06-15.)
+      BTX_RPC_STARTUP_ATTEMPTS: ${BTX_RPC_STARTUP_ATTEMPTS:-1800}
       # --- v3 solver pipeline-overlap knobs --------------------------------
       # The overlap patch (patches-overlap/) is now COMPILED INTO btx-miner:local
       # by the Dockerfile, and async defaults to 1 so plain `make solo`/`make up`

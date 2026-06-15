@@ -160,7 +160,7 @@ log "Starting btxd to provision your self-custody wallet..."
 # minutes rebuilding shielded-state indexes while RPC reports "Loading wallet…"
 # (-28).  The old 3-minute wait made the wrapper give up even though btxd was
 # healthy and still recovering.  Give it enough room to finish and then mine.
-for _ in $(seq 1 "${BTX_RPC_STARTUP_ATTEMPTS:-300}"); do "$CLI" -datadir="$DATADIR" getblockchaininfo >/dev/null 2>&1 && break; sleep 2; done
+for _ in $(seq 1 "${BTX_RPC_STARTUP_ATTEMPTS:-1800}"); do "$CLI" -datadir="$DATADIR" getblockchaininfo >/dev/null 2>&1 && break; sleep 2; done
 "$CLI" -datadir="$DATADIR" getblockchaininfo >/dev/null 2>&1 \
   || { log "RPC didn't come up; see $DATADIR/debug.log"; exit 1; }
 "$CLI" -datadir="$DATADIR" -named createwallet wallet_name="$WALLET" load_on_startup=true >/dev/null 2>&1 \
