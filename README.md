@@ -174,4 +174,6 @@ This repo is just packaging + tuning on top of other people's hard work. Thanks 
 
 ## License
 
-[GNU General Public License v3.0](LICENSE)
+Proprietary - Copyright (c) 2026 AM2 LLC. All rights reserved. See [LICENSE](LICENSE).
+Third-party components (btxchain/btx and its Bitcoin Core lineage) remain under the
+MIT License. matador-miner release binaries ship under their own end-user terms.
