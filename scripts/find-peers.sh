@@ -61,4 +61,4 @@ for ip in $GOOD; do
   dx sh -c "grep -q \"addnode=$ip:\" /data/btx.conf || echo \"addnode=$ip:$PORT\" >> /data/btx.conf"
 done
 echo "    btx.conf now has $(dx sh -c 'grep -c ^addnode= /data/btx.conf') addnodes"
-echo "    (persisted; also seed scripts/../entrypoint.sh for fresh-data-dir starts)"
+echo "    (persisted; also seed node/entrypoint.sh for fresh-data-dir starts)"
