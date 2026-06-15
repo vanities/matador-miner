@@ -150,6 +150,19 @@ A 5090 mining full-tilt draws ~0.5 kW, roughly **$1-2/day** in electricity. For 
 nonces/watt rather than peak rate, `scripts/gpu-tune.service` locks the clock + caps power
 (~346 W at ~99% of the hashrate); install it per the comments in that file.
 
+## Credits / thanks
+
+This repo is just packaging + tuning on top of other people's hard work. Thanks to:
+
+- **[`btxchain/btx`](https://github.com/btxchain/btx)** - the BTX node, the MatMul
+  proof-of-work, and the CUDA backend this builds and mines with. Everything here
+  compiles a pinned commit of it.
+- **[`dexbtx/minebtx`](https://github.com/dexbtx/minebtx)** (shib) - the minebtx
+  pool and the open-source `dexbtx-miner` stratum orchestrator that the pool path
+  is modeled on.
+- **[`thekillsquad007/btx-nvidia-miner`](https://github.com/thekillsquad007/btx-nvidia-miner)**
+  - the integrated CUDA miner that **MATADOR** (`make matador`) is forked from.
+
 ## License
 
 [GNU General Public License v3.0](LICENSE)
