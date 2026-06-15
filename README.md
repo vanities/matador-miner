@@ -2,11 +2,9 @@
 
 ![MATADOR - fearless BTX MatMul miner](docs/matador.png)
 
-> **Solo mining is the recommended path** (`make solo`): a sandboxed BTX full node + CUDA
-> MatMul miner pinned to **0.32.11**, keeping 100% of every block it finds (no fee) plus
-> our +22.9% pipeline-overlap. **Pool mining works again at v3** (`make pool`, on
-> btx-prebuilds-v0.32.11): minebtx now broadcasts `parent_mtp` in the stratum job, so the
-> earlier v3 starvation is gone - see [Solo vs pool](#solo-vs-pool).
+> **Solo mining** (`make solo`): a sandboxed BTX full node + CUDA MatMul miner pinned to
+> **0.32.11**, keeping 100% of every block it finds (no fee) plus our +22.9%
+> pipeline-overlap.
 
 A Docker setup to point an idle NVIDIA GPU (e.g. an RTX 5090) at the `btxchain/btx` chain
 and mine, keeping the node, miner, and wallet data isolated from the host.
@@ -60,32 +58,11 @@ keeps this short - see [Fast-start](#fast-start--snapshot-0321), prints **your**
 mining address, and starts a supervised solo-mining loop. Rebuilds reuse Docker's
 layer cache, so nothing recompiles unless you change `BTX_SOURCE_REF`.
 
-## Solo vs pool
+## Why solo
 
-**Solo (`make solo`) is recommended.** You run your own node + our CUDA solver, keep 100%
-of every block (no fee), saturate the GPU (~100% on a 5090), and get our +22.9%
-pipeline-overlap that a closed pool binary can't carry. The trade-off is variance: solo is
-an all-or-nothing block lottery.
-
-**Pool mining works at v3.** At height 130,500+ each nonce's MatMul seed binds to
-`parent_mtp` (the parent block's median-time-past). This briefly looked like a protocol
-block, but it isn't: **minebtx broadcasts `parent_mtp` in the stratum `mining.notify`**
-(verify with `pool-probe.py`, below), and the public clients read it straight off the wire.
-
-- `make pool` - the official `btx-gbt-solve` on **btx-prebuilds-v0.32.11** (dexbtx-miner
-  v0.4.16). v0.32.11 wired the V3 seed builder into the GPU scan kernel, fixing the
-  v0.32.10 starvation (where it fell back to the CPU path at ~3-30% util). Our last pool
-  run landed shares cleanly at v3 (1164 accepted / 0 rejected). Trades a 2.5% fee for steady
-  PPLNS payouts (much lower variance than solo).
-- `make matador` - **MATADOR**, our fork of the fully-open `thekillsquad007/btx-nvidia-miner`
-  (integrated stratum+CUDA). It reads `parent_mtp` off the same job and *fails closed*
-  without it; a viable open-source fallback (carries a ~1% dev fee).
-
-**Solo still edges pool** on raw take (no 2.5% fee + the overlap), so it stays the default;
-pool is the lower-variance option when you want steady payouts.
-`scripts/pool-probe.py <host> <port> <btx-addr>` passively inspects any pool's job format
-(no GPU, no mining, won't disturb a running solo miner) - it's what confirmed minebtx now
-conveys `parent_mtp`, `seed_a`, and `seed_b`.
+You run your own node + our CUDA solver, keep 100% of every block (no fee), saturate the
+GPU (~100% on a 5090), and get our +22.9% pipeline-overlap that a closed pool binary can't
+carry. The trade-off is variance: solo is an all-or-nothing block lottery.
 
 ## Operations (host-side helpers)
 
@@ -167,10 +144,8 @@ This repo is just packaging + tuning on top of other people's hard work. Thanks 
   proof-of-work, and the CUDA backend this builds and mines with. Everything here
   compiles a pinned commit of it.
 - **[`dexbtx/minebtx`](https://github.com/dexbtx/minebtx)** (shib) - the minebtx
-  pool and the open-source `dexbtx-miner` stratum orchestrator that the pool path
-  is modeled on.
-- **[`thekillsquad007/btx-nvidia-miner`](https://github.com/thekillsquad007/btx-nvidia-miner)**
-  - the integrated CUDA miner that **MATADOR** (`make matador`) is forked from.
+  pool and `dexbtx-miner` stratum orchestrator; the protocol reference for our
+  v2/v3 seed + `parent_mtp` handling.
 
 ## License
 

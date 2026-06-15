@@ -70,8 +70,8 @@ while :; do
   cur_solve="$(solvecnt)"; cur_solve="${cur_solve:-0}"
   d=$(( cur_solve - prev_solve )); prev_solve="$cur_solve"
 
-  # Idle gate: if the miner is DELIBERATELY paused (make stop-miner / make pool /
-  # make matador all set /data/.pause-mining), the solve counter is flat ON PURPOSE.
+  # Idle gate: if the miner is DELIBERATELY paused (make stop-miner sets
+  # /data/.pause-mining), the solve counter is flat ON PURPOSE.
   # The watchdog must NOT read that as a stall and restart - that fights the idle
   # gate and triggers a needless shielded-state rebuild warmup. (Bug hit live
   # 2026-06-15: the watchdog restarted idle-gated solo during a pool test.)

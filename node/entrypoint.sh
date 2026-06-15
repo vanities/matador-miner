@@ -219,10 +219,10 @@ fi
 
 # 5d) NODE-ONLY mode (BTX_MINING_ENABLED=0): keep the provisioning btxd up to
 #     serve the wallet + RPC (make balance / stats / address) WITHOUT mining or
-#     touching the GPU, so it can run alongside the pool (which owns the GPU).
-#     The provisioning daemon started above is already up with the wallet loaded;
-#     just supervise it here and flush cleanly on SIGTERM. No mining loop, no
-#     generatetoaddress, so the card stays 100% available to btx-pool.
+#     touching the GPU, so an external miner can own the card while btxd serves
+#     wallet/RPC. The provisioning daemon started above is already up with the
+#     wallet loaded; just supervise it here and flush cleanly on SIGTERM. No mining
+#     loop, no generatetoaddress, so the card stays 100% available to that miner.
 if [ "${BTX_MINING_ENABLED:-1}" = "0" ]; then
   node_only_stop() {
     log "[node] shutdown signal — flushing btxd cleanly..."

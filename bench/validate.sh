@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # validate.sh - the btx-dev-requested CUDA CORRECTNESS gate, as part of the bench.
 #
-# Runs numair's hardware-validation suite (pr58-validation/run-validation.sh):
+# Runs numair's hardware-validation suite (private/matador-miner/pr58-validation/run-validation.sh):
 #   - byte-exact CUDA-vs-CPU parity: matmul kernels + SHA windowed-scanner
 #   - compute-sanitizer memcheck (matmul + scanner)
 #   - compute-sanitizer synccheck (matmul __syncthreads barriers)
@@ -15,14 +15,14 @@
 #
 # Runs in a CUDA devel container (nvcc + compute-sanitizer), idle-gate-paused so
 # btxd stays up (no warmup, no lost social credit). On the GPU host:
-#   bash bench/validate.sh          # validate the committed pr58-validation harnesses
+#   bash bench/validate.sh          # validate the pr58-validation harnesses (in private/)
 #   VDIR=/path/to/validators bash bench/validate.sh   # point at patched harnesses
 set -uo pipefail
 
 SVC="${SVC:-btx-miner}"
 DEVEL="${DEVEL:-nvidia/cuda:13.0.0-devel-ubuntu24.04}"
 ARCH="${ARCH:-sm_120}"
-VDIR="${VDIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/pr58-validation}"
+VDIR="${VDIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/private/matador-miner/pr58-validation}"
 
 [ -f "$VDIR/run-validation.sh" ] || { echo "no run-validation.sh in $VDIR"; exit 1; }
 command -v nvidia-smi >/dev/null || { echo "nvidia-smi not found (run on the GPU host)"; exit 1; }

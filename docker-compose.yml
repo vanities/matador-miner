@@ -2,6 +2,7 @@ services:
   btx-miner:
     build:
       context: .
+      dockerfile: node/Dockerfile
       args:
         # 0.32.11 compiled from source (native sm_120 codegen for the 5090; byte-
         # reproducible from a pinned tag commit). 0.32.11 = btx-node sync that HARDENS
@@ -30,9 +31,9 @@ services:
       BTX_INSTALL_MODE: source
       BTX_MATMUL_BACKEND: cuda
       # 1 (default) = node + GPU mining (solo). 0 = NODE-ONLY: run btxd for the
-      # wallet/RPC with NO mining and NO GPU, so it can sit alongside btx-pool and
-      # let `make balance`/`make stats` work while pooling. `make node` sets this 0;
-      # `make solo` leaves it at the default 1. See entrypoint.sh step 5d.
+      # wallet/RPC with NO mining and NO GPU (e.g. to point an external miner at it
+      # while `make balance`/`make stats` keep working). `make node` sets this 0;
+      # `make solo` leaves it at the default 1. See node/entrypoint.sh step 5d.
       BTX_MINING_ENABLED: ${BTX_MINING_ENABLED:-1}
       # Provisioning RPC-startup wait (×2s each). The full shielded-state rebuild
       # (genesis replay, ~9-15min, slower under host load) must finish within this
@@ -43,7 +44,7 @@ services:
       # double-rebuild and caused a restart loop on 2026-06-15.)
       BTX_RPC_STARTUP_ATTEMPTS: ${BTX_RPC_STARTUP_ATTEMPTS:-1800}
       # --- v3 solver pipeline-overlap knobs --------------------------------
-      # The overlap patch (patches-overlap/) is now COMPILED INTO btx-miner:local
+      # The overlap patch (private/matador-miner/patches-overlap/) is COMPILED INTO btx-miner:local
       # by the Dockerfile, and async defaults to 1 so plain `make solo`/`make up`
       # run the validated +22.9% overlap. It is BYTE-EXACT vs serial (same found
       # nonces+digests), so on-by-default is safe. Set BTX_MATMUL_PIPELINE_ASYNC=0
@@ -56,68 +57,7 @@ services:
       - ./btx-data:/data           # blockchain + YOUR wallet (self-custody) — back this up
     # Intentionally NO published ports: the RPC interface stays inside the container.
 
-  # OPTIONAL pool-mining mode (minebtx / DEXBTX). Gated behind the "pool" profile
-  # so plain `docker compose up -d` (and `make up`) NEVER starts it — only
-  # `make pool` does. Solo and pool can't run at once (they'd fight over the GPU),
-  # so the make targets stop one before starting the other. Pool mode uses the
-  # pool's own btx-gbt-solve (now BTX v0.32.11, the v3 GPU-scan fix: saturates the
-  # card, comparable to solo minus our overlap patch) and trades a 2.5% fee for
-  # steady PPLNS payouts. See Dockerfile.pool for the version pins + trust note.
-  btx-pool:
-    profiles: ["pool"]             # opt-in: started only via `make pool`
-    build:
-      context: .
-      dockerfile: Dockerfile.pool
-    image: btx-miner-pool:local
-    container_name: btx-pool
-    restart: unless-stopped
-    gpus: all                      # contends with btx-miner — run one at a time
-    environment:
-      # Payout address is injected by `make pool` from address.txt (kept out of
-      # committed files). Unset => the entrypoint refuses to start (fail loud).
-      BTX_PAYOUT_ADDRESS: ${BTX_PAYOUT_ADDRESS:-}
-      BTX_POOL_HOST: minebtx.com
-      BTX_POOL_PORT: "3333"
-      BTX_POOL_WORKER: ${BTX_POOL_WORKER:-KING}
-      # 12 (down from 16) per tuning: sustains ~17K on this card. With gpu_inputs=1
-      # the solver is GPU-bound so 12-24 are all within ~0.5% (thread count only
-      # matters on the CPU-gated gpu_inputs=0 path); 12 leaves more CPU headroom.
-      BTX_SOLVER_THREADS: ${BTX_SOLVER_THREADS:-12}
-      # gpu_inputs=1 default: on-GPU input generation. Verified on the 5090 this
-      # takes the card from ~5% util (the pool's CPU-gated gpu_inputs:0 default,
-      # which starves a fast GPU) to ~70-85% with shares landing. Override with
-      # BTX_GPU_INPUTS=0 for a slow card where CPU-side prep keeps up.
-      BTX_GPU_INPUTS: ${BTX_GPU_INPUTS:-1}
-    # NO volumes: the pool client needs no wallet/chain data — payout is to a
-    # public address, so no keys are mounted into the third-party solver.
-
-  # MATADOR — our BTX MatMul pool miner (fork of thekillsquad007/btx-nvidia-miner): an
-  # integrated stratum+CUDA binary that saturates the 5090 (~86-95%) and lands valid
-  # v3 shares. NOTE: now largely SUPERSEDED. The official btx-gbt-solve's ~3% util was
-  # the v0.32.10 build; btx-prebuilds-v0.32.11 fixed the v3 GPU-scan, so `make pool`
-  # (bumped to v0.4.16/v0.32.11) is again effective and is the preferred pool path.
-  # MATADOR stays as a fallback + proof our shares are accepted. Built from a pinned,
-  # audited commit (Dockerfile.matador). Started only via `make matador`. Sandboxed:
-  # non-root, NO wallet/datadir mount, egress is the stratum pool only (audited).
-  matador:
-    profiles: ["matador"]
-    build:
-      context: .
-      dockerfile: Dockerfile.matador
-    image: matador:local
-    container_name: matador
-    restart: unless-stopped
-    gpus: all                      # contends with btx-miner/btx-pool — run one at a time
-    environment:
-      BTX_PAYOUT_ADDRESS: ${BTX_PAYOUT_ADDRESS:-}
-      BTX_POOL_HOST: stratum.minebtx.com
-      BTX_POOL_PORT: "3333"
-      BTX_POOL_WORKER: ${BTX_POOL_WORKER:-MATADOR}
-      # Upstream dev fee (1 slice in 100, ~1%). Set BTX_DEV_FEE=0 to keep all shares.
-      BTX_DEV_FEE: ${BTX_DEV_FEE:-1}
-      # Batch size = the dominant throughput lever. Swept on the 5090: batch=32768 gives
-      # +107% over the 0.2.32 auto-pick (2626) at best nonces/watt (29.7k n/s/W, ~455W),
-      # within 4% of the raw peak (65536). VRAM is NOT the bound (~7GB of 32GB used). See
-      # bench/matador-batch-sweep.md. Override via BTX_BATCH (e.g. 65536 for peak raw rate).
-      BTX_BATCH: ${BTX_BATCH:-32768}
-    # NO volumes: pool mode needs no wallet/chain data.
+  # NOTE: the old pool (btx-pool, official btx-gbt-solve) and fork (matador,
+  # thekillsquad007/btx-nvidia-miner) services were REMOVED 2026-06-15 - superseded
+  # by our standalone matador-miner (separate node + miner, in private/). The old
+  # Dockerfiles/entrypoints are in git history if ever needed.

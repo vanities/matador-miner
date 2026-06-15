@@ -65,32 +65,18 @@ RUN git init -q \
  && git fetch --depth 1 origin "${BTX_SOURCE_REF}" \
  && git checkout -q FETCH_HEAD
 
-# Local optimization patches (PR #58): windowed-SHA scanner + matrix-gen, single-
-# reduction + factored compression, and seed/template midstates. These were
-# UPSTREAMED into btx 0.32.8's src/cuda/ (matmul_accel.cu / oracle_accel.cu), so
-# they are DISABLED by default (APPLY_LOCAL_PATCHES=0). Verified against the 0.32.8
-# tree: all six no longer apply because the code they add now ships upstream, which
-# is exactly the "build fails LOUDLY -> drop the patch" signal this step was built
-# to catch. The .patch files + their on-GPU validators (patches/validate-*.cu) are
-# retained for provenance and for re-deriving against any future rev that regresses
-# the kernels. To force-apply (e.g. against an older base) build with
-# --build-arg APPLY_LOCAL_PATCHES=1.
-ARG APPLY_LOCAL_PATCHES=0
-COPY patches/ /opt/btx-patches/
-RUN if [ "${APPLY_LOCAL_PATCHES}" = "1" ]; then \
-      for p in /opt/btx-patches/*.patch; do echo "applying $p"; git apply --verbose "$p"; done; \
-    else echo "APPLY_LOCAL_PATCHES=0 - patches upstreamed in 0.32.8, building stock"; fi
-
-# v3 pipeline-overlap patch (patches-overlap/, src/pow.cpp ONLY). NOT upstreamed,
-# so unlike the PR #58 patches above this is applied BY DEFAULT — it is the source
-# of the validated +22.9% live throughput. Pure scheduling: PoW math, seed
-# derivation and parent_mtp handling are untouched, and the overlap stays gated at
-# RUNTIME behind BTX_MATMUL_PIPELINE_ASYNC (compose defaults it to 1; set 0 for a
-# byte-exact serial A/B without rebuilding). If the patch ever fails to apply
-# against a future BTX_SOURCE_REF the build fails LOUDLY here — re-derive it then.
-# Disable entirely with --build-arg APPLY_OVERLAP_PATCH=0 (builds the stock solver).
+# v3 pipeline-overlap patch (src/pow.cpp ONLY). NOT upstreamed — it is the source
+# of the validated +22.9% live throughput, so it is applied BY DEFAULT. Pure
+# scheduling: PoW math, seed derivation and parent_mtp handling are untouched, and
+# the overlap stays gated at RUNTIME behind BTX_MATMUL_PIPELINE_ASYNC (compose
+# defaults it to 1; set 0 for a byte-exact serial A/B without rebuilding). If the
+# patch ever fails to apply against a future BTX_SOURCE_REF the build fails LOUDLY
+# here — re-derive it then. Disable with --build-arg APPLY_OVERLAP_PATCH=0 (stock
+# solver). Source lives in private/ (gitignored secret sauce) — it stays in the
+# build context locally + is synced to pc, so the live build sees it. A checkout
+# WITHOUT private/ cannot build this image (the COPY below requires it, by design).
 ARG APPLY_OVERLAP_PATCH=1
-COPY patches-overlap/ /opt/btx-overlap/
+COPY private/matador-miner/patches-overlap/ /opt/btx-overlap/
 RUN if [ "${APPLY_OVERLAP_PATCH}" = "1" ]; then \
       echo "applying v3 pipeline-overlap patch (+22.9% live; src/pow.cpp only)"; \
       git apply --verbose /opt/btx-overlap/v3-pipeline-overlap.patch; \
@@ -148,7 +134,7 @@ COPY --from=builder /opt/btx-src/build/bin/ /opt/btx/bin/
 COPY --from=builder /opt/btx-src/contrib/   /opt/btx-src/contrib/
 ENV PATH=/opt/btx/bin:${PATH}
 
-COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY node/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
 VOLUME ["/data"]
