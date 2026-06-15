@@ -49,7 +49,9 @@ solver_batch_size: ${BTX_SOLVER_BATCH_SIZE:-128}
 solver_prefetch_depth: ${BTX_SOLVER_PREFETCH:-8}
 solver_prepare_workers: ${BTX_SOLVER_WORKERS:-16}
 solver_pipeline_async: 1
-gpu_inputs: ${BTX_GPU_INPUTS:-0}
+# NOTE: the daemon path ignores this key and reads BTX_MATMUL_GPU_INPUTS instead
+# (exported below). Kept aligned to the same :-1 default so they never disagree.
+gpu_inputs: ${BTX_GPU_INPUTS:-1}
 
 nonces_per_slice: 2000000
 reconnect_initial_s: 1.0
@@ -59,7 +61,7 @@ YAML
 
 log "pool=${POOL_HOST}:${POOL_PORT}  worker=${WORKER}  backend=${BTX_SOLVER_BACKEND:-cuda}  threads=${THREADS}  gpu_inputs=${BTX_GPU_INPUTS:-0}"
 log "payout → ${ADDRESS}"
-log "NOTE: pool mode uses the pool's btx-gbt-solve (BTX v0.32.10; our PR#58 kernels now upstreamed), NOT our node solver."
+log "NOTE: pool mode uses the pool's btx-gbt-solve (BTX v0.32.11; our PR#58 kernels now upstreamed), NOT our node solver."
 
 # CRITICAL: btx-gbt-solve reads on-GPU input generation from the env var
 # BTX_MATMUL_GPU_INPUTS, NOT from the config's gpu_inputs key. dexbtx-miner v0.4.14's
