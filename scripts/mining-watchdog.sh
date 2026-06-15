@@ -70,10 +70,25 @@ while :; do
   cur_solve="$(solvecnt)"; cur_solve="${cur_solve:-0}"
   d=$(( cur_solve - prev_solve )); prev_solve="$cur_solve"
 
-  # --- peering monitor (idea #4) ---
+  # --- peering monitor + auto-remediation (idea #4) ---
+  # A uniformly-STALE peer set is the dangerous case: every connected peer agrees
+  # on an old tip, so chain-guard sees no median gap (should_pause stays false) and
+  # the miner happily mines a DOOMED tip. near_tip_peers=0 at tip is the tell.
+  # Confirmed live 2026-06-15 (post-restart partition at h=131559 while canonical
+  # was 131613); `find-peers.sh --add` fixed it instantly. So here we don't just
+  # warn — we auto-run it (once per episode; peer_zero resets when peers recover).
   if [ "$IBD" != "true" ] && [ "$ntp" -le 0 ] 2>/dev/null; then
     peer_zero=$((peer_zero+1))
-    [ "$peer_zero" -eq "$peer_need" ] && alert "WARN" "near_tip_peers=0 for ${PEER_MIN}m at tip - stale-tip risk is high under v3 (consider addnode)"
+    if [ "$peer_zero" -eq "$peer_need" ]; then
+      alert "WARN" "near_tip_peers=0 for ${PEER_MIN}m at tip - stale-tip risk high under v3; auto-running find-peers --add"
+      if [ -f scripts/find-peers.sh ]; then
+        timeout 150 bash scripts/find-peers.sh --add >/dev/null 2>&1 \
+          && log "auto-remediation: find-peers --add completed" \
+          || log "auto-remediation: find-peers --add failed/timed out"
+      else
+        log "auto-remediation skipped: scripts/find-peers.sh not found (run watchdog from the repo dir)"
+      fi
+    fi
   else peer_zero=0; fi
 
   # --- stall detection: at tip, NOT paused, but solve counter flat ---
