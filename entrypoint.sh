@@ -244,6 +244,9 @@ log "Starting GPU mining loop (generatetoaddress via CUDA). 'docker compose down
   --results-dir="$DATADIR/mining-ops" \
   --daemon="$BTXD" \
   --cli="$CLI" \
-  --should-mine-command=/bin/true &
+  # Idle gate: pause GPU mining WITHOUT restarting btxd (no shielded-state warmup).
+  # Stop the miner:  docker compose exec btx-miner touch /data/.pause-mining   (or: make stop-miner)
+  # Resume:          docker compose exec btx-miner rm   /data/.pause-mining    (or: make start-miner)
+  --should-mine-command="test ! -f $DATADIR/.pause-mining" &
 LOOP_PID=$!
 wait "$LOOP_PID"

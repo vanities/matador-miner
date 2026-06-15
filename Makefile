@@ -13,7 +13,7 @@ CLI  = $(COMPOSE) exec -T $(SVC) btx-cli -datadir=$(DATADIR)
 WCLI = $(CLI) -rpcwallet=$(WALLET)
 
 .DEFAULT_GOAL := help
-.PHONY: help up down restart logs stats status balance address gpu bench pool matador solo deploy pool-logs matador-logs shell cli backup restore reset clean
+.PHONY: help up down restart logs stats status balance address gpu bench pool matador solo deploy stop-miner start-miner pool-logs matador-logs shell cli backup restore reset clean
 
 # Payout address for pool mode — pulled from address.txt (gitignored) so it
 # never lands in a committed file. The first btx1... line wins.
@@ -84,6 +84,12 @@ solo: ## Switch back to SOLO mining (our patched node) — stops pool
 	@echo "Starting SOLO miner..."
 	@$(COMPOSE) up -d $(SVC)
 	@echo "Solo mining (our optimized solver)."
+
+stop-miner: ## Pause GPU mining (idle gate) - keeps btxd + node synced + keeper alive, NO warmup
+	@$(COMPOSE) exec -T $(SVC) touch $(DATADIR)/.pause-mining && echo "Miner paused; node stays up. Resume: make start-miner"
+
+start-miner: ## Resume GPU mining after stop-miner (instant, no warmup)
+	@$(COMPOSE) exec -T $(SVC) rm -f $(DATADIR)/.pause-mining && echo "Miner resumed."
 
 deploy: ## Minimal-downtime version bump: build new image WHILE mining continues, then swap + time the warmup gap
 	@echo "[deploy] building $(SVC) (the running miner keeps mining during the build)..."
