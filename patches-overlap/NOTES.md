@@ -1,7 +1,10 @@
 # v3 nonce-seeded solver: pipeline overlap port
 
-Status: BUILD + BYTE-EXACT VALIDATION (Phase 1). NOT deployed. Production solo
-(btx-miner container, btx-miner:local image) untouched.
+Status: VALIDATED (byte-exact) + WIRED INTO THE DEFAULT BUILD. The Dockerfile now
+applies this patch by default (APPLY_OVERLAP_PATCH=1) and docker-compose defaults
+BTX_MATMUL_PIPELINE_ASYNC=1, so `make solo`/`make up`/`make deploy` build and run
+the overlap in btx-miner:local. Set BTX_MATMUL_PIPELINE_ASYNC=0 for a serial A/B
+(no rebuild), or build with --build-arg APPLY_OVERLAP_PATCH=0 to omit it entirely.
 
 Source base: btxchain/btx v0.32.11, commit 215170f27f7d6889ce34aa7dbba2858ea07a468c
 Patch: patches-overlap/v3-pipeline-overlap.patch (applies to a pristine v0.32.11 tree)

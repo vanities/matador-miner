@@ -8,8 +8,9 @@
 # no longer the throughput sacrifice it was on the old CPU-gated builds: at
 # v0.32.11 it saturates the card (shib's 5090s report ~20k), trading a 2.5% fee for
 # steady weekly PPLNS payouts vs solo's block lottery. Solo still edges it: solo
-# runs the same v0.32.11 solver PLUS our pipeline-overlap patch (+22.9%, image
-# btx-miner:overlap) that a closed, sha256-pinned pool binary can't carry.
+# runs the same v0.32.11 solver PLUS our pipeline-overlap patch (+22.9%, now
+# compiled into btx-miner:local by default) that a closed, sha256-pinned pool
+# binary can't carry.
 #
 # We replicate https://minebtx.com/install.sh's steps with PINNED versions
 # (rather than `curl | bash`) so the build is reproducible and the closed solver
