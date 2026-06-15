@@ -1,4 +1,4 @@
-# btx-miner - isolated GPU miner for `btxchain/btx`
+# matador-miner - isolated GPU miner for `btxchain/btx`
 
 ![MATADOR - fearless BTX MatMul miner](docs/matador.png)
 
@@ -83,7 +83,8 @@ So for now, **solo is the play.** Pool support comes back if a pool broadcasts `
 Optional but recommended for an unattended rig. Run them detached on the Linux box:
 
 ```bash
-cd ~/git/btx-miner && mkdir -p ops-logs
+# from your clone on the Linux box:
+mkdir -p ops-logs
 nohup bash scripts/empty-block-keeper.sh >> ops-logs/empty-block-keeper.log 2>&1 </dev/null & disown
 nohup bash scripts/mining-watchdog.sh    >> ops-logs/mining-watchdog.log    2>&1 </dev/null & disown
 ```
