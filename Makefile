@@ -13,7 +13,7 @@ CLI  = $(COMPOSE) exec -T $(SVC) btx-cli -datadir=$(DATADIR)
 WCLI = $(CLI) -rpcwallet=$(WALLET)
 
 .DEFAULT_GOAL := help
-.PHONY: help up down restart logs stats status balance address gpu bench pool matador solo deploy stop-miner start-miner pool-logs matador-logs shell cli backup restore reset clean
+.PHONY: help up down restart logs stats status balance address gpu bench pool matador solo deploy stop-miner start-miner safe-stop safe-restart pool-logs matador-logs shell cli backup restore reset clean
 
 # Payout address for pool mode — pulled from address.txt (gitignored) so it
 # never lands in a committed file. The first btx1... line wins.
@@ -105,12 +105,20 @@ stop-miner: ## Pause GPU mining (idle gate) - keeps btxd + node synced + keeper 
 start-miner: ## Resume GPU mining after stop-miner (instant, no warmup)
 	@$(COMPOSE) exec -T $(SVC) rm -f $(DATADIR)/.pause-mining && echo "Miner resumed."
 
+safe-stop: ## Wait for a caught-up + well-peered window, THEN stop btxd cleanly (so next boot fast-restores, not a 15min rebuild)
+	@bash scripts/clean-stop.sh
+
+safe-restart: ## Clean-stop at a safe window, then start again — same container, expect ~30s fast-restore (use this instead of `make restart`)
+	@ACTION=restart bash scripts/clean-stop.sh
+
 deploy: ## Minimal-downtime version bump: build new image WHILE mining continues, then swap + time the warmup gap
 	@echo "[deploy] building $(SVC) (the running miner keeps mining during the build)..."
 	@$(COMPOSE) build $(SVC)
 	@echo "[deploy] build OK. Stopping any pool-side miner, then swapping solo to the new image..."
 	@$(COMPOSE) --profile pool stop btx-pool 2>/dev/null || true
 	@$(COMPOSE) --profile matador stop matador 2>/dev/null || true
+	@echo "[deploy] waiting for a caught-up + well-peered window before the swap (clean stop -> best chance of a fast restore)..."
+	@ACTION=wait MAX_WAIT_MIN=$${DEPLOY_WAIT_MIN:-15} bash scripts/clean-stop.sh || echo "[deploy] no clean window in time — swapping anyway (may rebuild)"
 	@t0=$$(date +%s); $(COMPOSE) up -d $(SVC); \
 	  echo "[deploy] swapped; waiting for mining to resume (warmup = shielded state + sync catch-up)..."; \
 	  for i in $$(seq 1 90); do \

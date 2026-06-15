@@ -30,6 +30,24 @@ log(){ printf '\n\033[1;36m[btx-miner]\033[0m %s\n' "$*"; }
 
 mkdir -p "$DATADIR"
 
+# Clear stale LOCKs left by a previous kill -9 / SIGKILL (per shib). A hard kill
+# leaves blocks/.lock + leveldb LOCK + shielded_state LOCK behind; btxd then
+# refuses to start until they're removed. We are PID 1 at container start and no
+# btxd is running yet, so any lock file here is stale by definition -> safe to
+# remove. This lets a hard-killed node self-recover on the next start instead of
+# wedging. (Clean stops via graceful_stop don't leave these; this is the safety net.)
+clear_stale_locks() {
+  local f n=0
+  for f in "$DATADIR/.lock" "$DATADIR/btxd.pid" "$DATADIR/blocks/.lock"; do
+    [ -e "$f" ] && { rm -f "$f" && n=$((n+1)); }
+  done
+  while IFS= read -r f; do [ -n "$f" ] && rm -f "$f" && n=$((n+1)); done <<EOF
+$(find "$DATADIR/chainstate" "$DATADIR/blocks/index" "$DATADIR/shielded_state" -name LOCK -type f 2>/dev/null)
+EOF
+  [ "$n" -gt 0 ] && log "cleared $n stale lock file(s) from a prior unclean exit (no btxd running yet, safe)."
+}
+clear_stale_locks
+
 find_bin(){
   local n="$1" c
   for c in "$INSTALL_DIR/bin/$n" "$DATADIR/bin/$n"; do [ -x "$c" ] && { echo "$c"; return 0; }; done
