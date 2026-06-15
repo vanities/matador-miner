@@ -1,17 +1,20 @@
 # Isolated BTX GPU solo-miner — COMPILES btxchain/btx from source.
 #
-# Pinned to the v0.32.10 tag commit, compiled WITH the CUDA MatMul backend.
+# Pinned to the v0.32.11 tag commit, compiled WITH the CUDA MatMul backend PLUS
+# our v3 pipeline-overlap patch (+22.9% live; patches-overlap/, src/pow.cpp only).
 # Upstream ships GPG-signed cuda13 prebuilts for tagged releases, but we compile
 # by choice: it guarantees native sm_120 codegen for the RTX 5090 (the prebuilt's
 # embedded archs are unverified) and yields a byte-reproducible build from an
 # immutable SHA. To run the signed prebuilt instead, set BTX_INSTALL_MODE=release
-# + RELEASE_TAG=v0.32.10 in docker-compose.yml (the entrypoint keeps that path).
+# + RELEASE_TAG=v0.32.11 in docker-compose.yml (the entrypoint keeps that path).
 #
-# 0.32.10 is a btx-node sync point release (tag cut 2026-06-14). It adds a MatMul
-# SEED-DERIVATION v3 CONSENSUS upgrade at HEIGHT 130,500 (the v2 seed binds more
-# chain data; nodes/miners/pools/services must upgrade before 130,500) and
-# PRESERVES the 0.32.9 empty-block subsidy rule at height 130,000. The v3 change
-# lives in pow.cpp + chainparams/validation; src/cuda/ is UNTOUCHED, so the stock
+# 0.32.11 is a btx-node sync point release that HARDENS MatMul v3 parent-MTP seed
+# handling across CPU/Metal/CUDA (fixes the v3 GPU-scan stall hit on 0.32.10) and
+# ADDS forward consensus at height 132,000 (velocity cap, empty-block penalty end,
+# recovery-exit) — upgrade before 132,000. (0.32.10 added the MatMul SEED-DERIVATION
+# v3 CONSENSUS upgrade at HEIGHT 130,500 — the v2 seed binds more chain data; all
+# nodes/miners/pools/services had to upgrade before 130,500.) The v3 change lives in
+# pow.cpp + chainparams/validation; src/cuda/ is otherwise UNTOUCHED, so the stock
 # build compiles the official v3 logic verbatim and stays consensus-correct
 # (APPLY_LOCAL_PATCHES=0; our PR #58 kernels remain upstreamed). (0.32.9 = the
 # empty-block subsidy rule @130,000 + 25-tx template cap + reorg-parking; 0.32.8
@@ -37,15 +40,20 @@ ARG CUDA_RUNTIME_IMAGE=nvidia/cuda:13.0.0-runtime-ubuntu24.04
 FROM ${CUDA_DEVEL_IMAGE} AS builder
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Exact upstream commit to compile. 33c79755 = the v0.32.10 release tag commit. An
+# Exact upstream commit to compile. 215170f2 = the v0.32.11 release tag commit. An
 # immutable SHA means every rebuild on every box produces a byte-identical tree.
-ARG BTX_SOURCE_REF=33c79755e01465d933f0abba6bbba0e2dcbb207f
+ARG BTX_SOURCE_REF=215170f27f7d6889ce34aa7dbba2858ea07a468c
 # sm_120 = NVIDIA Blackwell (RTX 5090). Other GPUs: Ada=89, Hopper=90, Ampere=80/86.
 ARG BTX_CUDA_ARCHITECTURES=120
 
-# Bitcoin-core (CMake) build deps + git to fetch the pinned commit.
+# Bitcoin-core (CMake) build deps + git to fetch the pinned commit. ccache caches
+# compiler output (incl. nvcc, via CMAKE_CUDA_COMPILER_LAUNCHER below) so a node
+# SHA bump only recompiles the changed translation units — the big win on the slow
+# CUDA TUs. The cache persists across builds via a BuildKit cache mount on the
+# build step. ccache caches the EXACT compiler output, so the built tree is
+# bit-identical to a no-ccache build (the pinned-SHA reproducibility guarantee holds).
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      build-essential cmake pkg-config python3 git ca-certificates \
+      build-essential ccache cmake pkg-config python3 git ca-certificates \
       libevent-dev libsqlite3-dev libboost-dev \
  && rm -rf /var/lib/apt/lists/*
 
@@ -73,6 +81,21 @@ RUN if [ "${APPLY_LOCAL_PATCHES}" = "1" ]; then \
       for p in /opt/btx-patches/*.patch; do echo "applying $p"; git apply --verbose "$p"; done; \
     else echo "APPLY_LOCAL_PATCHES=0 - patches upstreamed in 0.32.8, building stock"; fi
 
+# v3 pipeline-overlap patch (patches-overlap/, src/pow.cpp ONLY). NOT upstreamed,
+# so unlike the PR #58 patches above this is applied BY DEFAULT — it is the source
+# of the validated +22.9% live throughput. Pure scheduling: PoW math, seed
+# derivation and parent_mtp handling are untouched, and the overlap stays gated at
+# RUNTIME behind BTX_MATMUL_PIPELINE_ASYNC (compose defaults it to 1; set 0 for a
+# byte-exact serial A/B without rebuilding). If the patch ever fails to apply
+# against a future BTX_SOURCE_REF the build fails LOUDLY here — re-derive it then.
+# Disable entirely with --build-arg APPLY_OVERLAP_PATCH=0 (builds the stock solver).
+ARG APPLY_OVERLAP_PATCH=1
+COPY patches-overlap/ /opt/btx-overlap/
+RUN if [ "${APPLY_OVERLAP_PATCH}" = "1" ]; then \
+      echo "applying v3 pipeline-overlap patch (+22.9% live; src/pow.cpp only)"; \
+      git apply --verbose /opt/btx-overlap/v3-pipeline-overlap.patch; \
+    else echo "APPLY_OVERLAP_PATCH=0 - building stock serial v3 solver (no overlap)"; fi
+
 # Configure with the CUDA MatMul backend (see upstream doc/build-unix.md):
 #   - node + cli + wallet(sqlite). BUILD_UTIL=ON only because the btx-matmul-*
 #     diagnostic + solve-bench tools are gated behind it in src/CMakeLists.txt.
@@ -80,7 +103,14 @@ RUN if [ "${APPLY_LOCAL_PATCHES}" = "1" ]; then \
 #   - CUDA runtime STATICALLY linked, matching the official cuda13 archives, so
 #     the runtime image needs no CUDA libs — only the host NVIDIA driver (which
 #     nvidia-container-toolkit injects at run time).
-RUN cmake -B build \
+# Persist ccache across builds via a BuildKit cache mount (requires BuildKit, the
+# default for `docker compose build` / `docker build` on modern Docker). WITH_CCACHE
+# wires the C/C++ launchers; CMAKE_CUDA_COMPILER_LAUNCHER routes nvcc through ccache
+# too (the slow CUDA TUs are where the rebuild win is). A clean build is a full
+# miss (no slower than before); a node SHA bump reuses the unchanged TUs.
+ENV CCACHE_DIR=/ccache CCACHE_MAXSIZE=5G
+RUN --mount=type=cache,target=/ccache \
+    cmake -B build \
       -DCMAKE_BUILD_TYPE=Release \
       -DBTX_ENABLE_CUDA_EXPERIMENTAL=ON \
       -DBTX_CUDA_ARCHITECTURES="${BTX_CUDA_ARCHITECTURES}" \
@@ -91,8 +121,9 @@ RUN cmake -B build \
       -DBUILD_GUI=OFF -DBUILD_TESTS=OFF -DBUILD_BENCH=OFF -DBUILD_TX=OFF \
       -DBUILD_UTIL=ON -DBUILD_WALLET_TOOL=OFF -DBUILD_UTIL_CHAINSTATE=OFF \
       -DWITH_BDB=OFF -DWITH_ZMQ=OFF -DWITH_USDT=OFF -DINSTALL_MAN=OFF \
-      -DWITH_CCACHE=OFF \
+      -DWITH_CCACHE=ON -DCMAKE_CUDA_COMPILER_LAUNCHER=ccache \
  && cmake --build build --parallel "$(nproc)" \
+ && ccache --show-stats \
  && strip --strip-unneeded build/bin/btxd build/bin/btx-cli || true
 
 # ---------- Stage 2: lean CUDA runtime (CUDA_RUNTIME_IMAGE declared up top) ----------
@@ -111,7 +142,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       libboost-system1.83.0 libboost-filesystem1.83.0 libboost-program-options1.83.0 \
  && rm -rf /var/lib/apt/lists/*
 
-# Compiled 0.32.10 binaries (btxd, btx-cli, btx-matmul-*) + the contrib/ scripts
+# Compiled 0.32.11 binaries (btxd, btx-cli, btx-matmul-*) + the contrib/ scripts
 # the entrypoint drives at run time (mining loop; faststart for release mode).
 COPY --from=builder /opt/btx-src/build/bin/ /opt/btx/bin/
 COPY --from=builder /opt/btx-src/contrib/   /opt/btx-src/contrib/

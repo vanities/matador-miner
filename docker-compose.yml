@@ -24,9 +24,9 @@ services:
     stop_grace_period: 120s        # give btxd time to flush cleanly on stop (entrypoint traps SIGTERM)
     gpus: all                      # requires nvidia-container-toolkit on the host
     environment:
-      # source  = run the 0.32.10 binaries compiled into the image (default).
+      # source  = run the 0.32.11 binaries compiled into the image (default).
       # release = download + GPG-verify the signed precompiled release instead;
-      #           for that, also set RELEASE_TAG=v0.32.10 here.
+      #           for that, also set RELEASE_TAG=v0.32.11 here.
       BTX_INSTALL_MODE: source
       BTX_MATMUL_BACKEND: cuda
       # 1 (default) = node + GPU mining (solo). 0 = NODE-ONLY: run btxd for the
@@ -34,12 +34,13 @@ services:
       # let `make balance`/`make stats` work while pooling. `make node` sets this 0;
       # `make solo` leaves it at the default 1. See entrypoint.sh step 5d.
       BTX_MINING_ENABLED: ${BTX_MINING_ENABLED:-1}
-      # --- v3 solver pipeline-overlap knobs (Phase 2 sweep) ---------------
-      # Passthrough only; ALL default to the stock SERIAL behaviour so an
-      # unset env (plain `make solo`) is byte-for-byte the old path. The
-      # overlap btxd lives in image btx-miner:overlap and is BYTE-EXACT vs
-      # serial (Phase 1). async=1 turns the overlap on; the rest tune it.
-      BTX_MATMUL_PIPELINE_ASYNC: ${BTX_MATMUL_PIPELINE_ASYNC:-0}
+      # --- v3 solver pipeline-overlap knobs --------------------------------
+      # The overlap patch (patches-overlap/) is now COMPILED INTO btx-miner:local
+      # by the Dockerfile, and async defaults to 1 so plain `make solo`/`make up`
+      # run the validated +22.9% overlap. It is BYTE-EXACT vs serial (same found
+      # nonces+digests), so on-by-default is safe. Set BTX_MATMUL_PIPELINE_ASYNC=0
+      # for a serial A/B baseline (no rebuild needed); the rest tune the overlap.
+      BTX_MATMUL_PIPELINE_ASYNC: ${BTX_MATMUL_PIPELINE_ASYNC:-1}
       BTX_MATMUL_PREPARE_PREFETCH_DEPTH: ${BTX_MATMUL_PREPARE_PREFETCH_DEPTH:-}
       BTX_MATMUL_PREPARE_WORKERS: ${BTX_MATMUL_PREPARE_WORKERS:-}
       BTX_MATMUL_GPU_INPUTS: ${BTX_MATMUL_GPU_INPUTS:-}

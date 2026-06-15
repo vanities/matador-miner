@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Recover a wedged BTX node: wipe chain + shielded state, re-fast-start from the
-# assumeutxo snapshot, KEEP the wallet + config (coins preserved), stay pruned.
+# assumeutxo snapshot, KEEP the wallet + config (coins preserved). The node runs
+# archival (prune=0, per entrypoint.sh) so it can rebuild shielded state locally.
 #
 # Use when btxd won't start — e.g. the shielded-state DB was left mid-write by a
-# hard kill, which a pruned node can't rebuild (it lacks the old blocks). A clean
-# snapshot reload sidesteps that: it re-establishes a consistent state at the
-# snapshot height without needing full history.
+# hard kill. A clean snapshot reload sidesteps that: it re-establishes a
+# consistent state at the snapshot height, then backfills/rebuilds from there.
 #
 # Run from the repo dir on the GPU host:   bash scripts/reset-faststart.sh
 set -euo pipefail
@@ -27,7 +27,7 @@ docker run --rm -v "$DATADIR_HOST":/data --entrypoint sh "$IMAGE" -c '
   echo "kept: $(ls -1 | tr "\n" " ")"
 '
 
-echo "==> Re-fast-starting (rebuilds image so the latest entrypoint is used; re-pulls ~347MB snapshot; btx.conf keeps prune=4096)..."
+echo "==> Re-fast-starting (rebuilds image so the latest entrypoint is used; re-pulls the assumeutxo snapshot; btx.conf keeps prune=0 / archival)..."
 docker compose up -d --build >/dev/null 2>&1
 
 echo "==> Waiting for snapshot load + node near tip (up to ~18 min)..."
