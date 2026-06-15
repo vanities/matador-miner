@@ -140,6 +140,13 @@ addnode=1.156.5.90:19335
 CONF
 fi
 
+# 0.32.11+ pins shielded assumeutxo snapshots; our fast-start snapshot (v0.32.2,
+# height 123225) is unpinned, so loadtxoutset refuses it without this override. With
+# prune=0 (archival) the node rebuilds the unshield-velocity state locally after the
+# load, so forcing it is safe. Idempotent: existing datadirs pick it up on next restart.
+grep -q '^allowunpinnedshieldedsnapshot=' "$DATADIR/btx.conf" 2>/dev/null \
+  || echo 'allowunpinnedshieldedsnapshot=1' >> "$DATADIR/btx.conf"
+
 # 5) Briefly start the daemon to create YOUR wallet + payout address, then stop
 #    it — the mining loop supervises its own daemon.
 log "Starting btxd to provision your self-custody wallet..."
