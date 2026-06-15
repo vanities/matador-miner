@@ -12,3 +12,6 @@ address.txt
 # our miner: tuned CUDA profile + custom launcher (the "secret sauce") — keep local
 private/
 docker-compose.override.yml
+
+# personal deploy tooling (has the pc path) — keep local
+sync-pc.sh
