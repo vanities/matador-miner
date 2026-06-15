@@ -2,14 +2,14 @@
 # solo-mining with our patched node. This is a SEPARATE, self-contained image:
 # solo (the default) still uses OUR node's optimized solver.
 #
-# The pool's closed `btx-gbt-solve` binary ships our PR#58 GPU kernel opts (first
-# adopted in btx-prebuilds-v0.32.5; as of btx-prebuilds-v0.32.8 they are upstreamed
-# into the BTX source itself, per its release notes) plus their own C4
-# job-feeding. So pool mode is no longer the ~3x throughput sacrifice it was on
-# the old 0.32.2 CPU-gated build — it's now roughly comparable to solo, trading a
-# 2.5% fee for steady weekly PPLNS payouts vs solo's block lottery. (A precise
-# solo-vs-pool speed gap would need a benchmark; solo still has on-GPU input gen
-# the pool's gpu_inputs:0 path lacks, so it may stay a touch ahead.)
+# The pool's closed `btx-gbt-solve` binary IS the BTX v0.32.11 solver (the same
+# kernels solo runs) with --share-target + --daemon patches, driven by the dexbtx
+# Python wrapper's C4 job-feeding + gpu_inputs=1 on-GPU input gen. So pool mode is
+# no longer the throughput sacrifice it was on the old CPU-gated builds: at
+# v0.32.11 it saturates the card (shib's 5090s report ~20k), trading a 2.5% fee for
+# steady weekly PPLNS payouts vs solo's block lottery. Solo still edges it: solo
+# runs the same v0.32.11 solver PLUS our pipeline-overlap patch (+22.9%, image
+# btx-miner:overlap) that a closed, sha256-pinned pool binary can't carry.
 #
 # We replicate https://minebtx.com/install.sh's steps with PINNED versions
 # (rather than `curl | bash`) so the build is reproducible and the closed solver
@@ -24,13 +24,18 @@ ARG CUDA_RUNTIME_IMAGE=nvidia/cuda:12.8.0-runtime-ubuntu24.04
 FROM ${CUDA_RUNTIME_IMAGE}
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Pins for the current minebtx release (matched pair: package v0.4.14 targets the
-# btx-prebuilds-v0.32.10 solver). SOLVER_SHA256 verified by download 2026-06-14.
+# Pins for the current minebtx release (matched pair: package v0.4.16 targets the
+# btx-prebuilds-v0.32.11 solver). SOLVER_SHA256 verified by download 2026-06-15.
 #   - dexbtx-miner Python package (the stratum orchestrator + C4 job feeding)
-#   - btx-gbt-solve x86_64 CUDA solver (BTX v0.32.10; seed-deriv v3 @130,500) + SHA256
-ARG DEXBTX_MINER_PKG_URL=https://github.com/dexbtx/minebtx/archive/refs/tags/v0.4.14.tar.gz
-ARG SOLVER_URL=https://github.com/dexbtx/minebtx/releases/download/btx-prebuilds-v0.32.10/btx-gbt-solve
-ARG SOLVER_SHA256=2c93d27cb1b0060f038ec40e8f34e9f1c0faa09c97cffaaea062d548aea59141
+#   - btx-gbt-solve x86_64 CUDA solver (BTX v0.32.11; v3 GPU-scan fix) + SHA256
+# v0.32.11 FIXES v0.32.10's half-wired MatMul-V3 GPU pre-hash scan (which fell back
+# to the slow CPU per-nonce path at height >=130,500: util ~1-7%). That stale
+# v0.32.10 pin is why pool mode looked GPU-starved and we reached for MATADOR;
+# v0.32.11 restores the GPU scan under V3 (the same fix solo got). Fat binary carries
+# native cubins sm_61..sm_120 (GTX 10-series through RTX 5090) + static cudart.
+ARG DEXBTX_MINER_PKG_URL=https://github.com/dexbtx/minebtx/archive/refs/tags/v0.4.16.tar.gz
+ARG SOLVER_URL=https://github.com/dexbtx/minebtx/releases/download/btx-prebuilds-v0.32.11/btx-gbt-solve
+ARG SOLVER_SHA256=3fbc9d71350db2b686a91b5768405a19f81246346a94bf70a151dd0b762c12f3
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
       python3 python3-pip curl ca-certificates \
