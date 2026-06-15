@@ -13,7 +13,7 @@ CLI  = $(COMPOSE) exec -T $(SVC) btx-cli -datadir=$(DATADIR)
 WCLI = $(CLI) -rpcwallet=$(WALLET)
 
 .DEFAULT_GOAL := help
-.PHONY: help up down restart logs stats status balance address gpu bench pool matador solo deploy stop-miner start-miner safe-stop safe-restart pool-logs matador-logs shell cli backup restore reset clean
+.PHONY: help up down restart logs stats status balance address gpu bench validate bench-full pool matador solo deploy stop-miner start-miner safe-stop safe-restart pool-logs matador-logs shell cli backup restore reset clean
 
 # Payout address for pool mode — pulled from address.txt (gitignored) so it
 # never lands in a committed file. The first btx1... line wins.
@@ -58,6 +58,12 @@ gpu: ## GPU utilization / power / temp (host nvidia-smi)
 
 bench: ## A/B the solver across images in v2 (live-representative) mode; pauses miner
 	@bash bench/ab.sh
+
+validate: ## CORRECTNESS gate (btx-dev suite): byte-exact CUDA-vs-CPU parity + compute-sanitizer memcheck/synccheck/racecheck. Run before ANY kernel deploy.
+	@bash bench/validate.sh
+
+bench-full: ## Full gate: validate (correctness) THEN v3 config sweep (throughput). The complete "is this kernel change safe + faster" check.
+	@bash bench/validate.sh && bash bench/v3-config-sweep.sh
 
 pool: ## Switch to POOL mining (minebtx v0.4.16/v0.32.11). PAUSES solo's GPU mining but keeps the node UP (no warmup); 2.5% fee for steady payouts
 	@test -n "$(POOL_ADDR)" || { echo "No btx1... payout address in address.txt — add one first."; exit 1; }
