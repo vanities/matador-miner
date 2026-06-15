@@ -21,7 +21,9 @@ else die "need sha256sum or shasum to verify the download"; fi
 if [ -n "${VERSION:-}" ]; then
   api="https://api.github.com/repos/$REPO/releases/tags/$VERSION"
 else
-  api="https://api.github.com/repos/$REPO/releases/latest"
+  # /releases (newest-first, INCLUDES prereleases) - not /releases/latest, which
+  # skips prereleases. The first linux-x86_64 asset below is the newest release's.
+  api="https://api.github.com/repos/$REPO/releases"
 fi
 
 log "resolving release: $api"
