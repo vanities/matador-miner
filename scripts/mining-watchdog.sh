@@ -115,8 +115,12 @@ while :; do
     if [ "$stall_samples" -ge "$stall_need" ]; then
       alert "ALERT" "STALL: solve counter flat ${STALL_MIN}m (delta=$d, gpu=${gpu}%) at h=$H/$HD, mining not paused"
       if [ "$restarts" -lt "$MAX_RESTARTS" ]; then
-        restarts=$((restarts+1)); log "recover $restarts/$MAX_RESTARTS: docker compose restart $SVC (note: will NOT fix a consensus stall)"
-        docker compose restart "$SVC" >/dev/null 2>&1
+        restarts=$((restarts+1)); log "recover $restarts/$MAX_RESTARTS: clean restart $SVC (stop -t 120 lets btxd FLUSH; a kill -9 mid-write leaves stale LOCKs + forces a full shielded rebuild)"
+        # CLEAN restart per shib: never SIGKILL btxd. `restart` defaults to a 10s
+        # timeout (SIGKILL after 10s) which truncates the shielded-state flush ->
+        # stale blocks/.lock + leveldb/shielded_state LOCK + a from-genesis rebuild
+        # next boot. -t 120 matches stop_grace_period so graceful_stop can finish.
+        docker compose restart -t 120 "$SVC" >/dev/null 2>&1
         stall_samples=0; prev_solve="$(solvecnt)"
       else
         alert "CRITICAL" "STALL persists after $restarts restarts - likely consensus/version (the v3 freeze needed 0.32.11, not a restart). Auto-restart OFF; needs a human."
