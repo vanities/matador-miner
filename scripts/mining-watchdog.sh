@@ -70,6 +70,20 @@ while :; do
   cur_solve="$(solvecnt)"; cur_solve="${cur_solve:-0}"
   d=$(( cur_solve - prev_solve )); prev_solve="$cur_solve"
 
+  # Idle gate: if the miner is DELIBERATELY paused (make stop-miner / make pool /
+  # make matador all set /data/.pause-mining), the solve counter is flat ON PURPOSE.
+  # The watchdog must NOT read that as a stall and restart - that fights the idle
+  # gate and triggers a needless shielded-state rebuild warmup. (Bug hit live
+  # 2026-06-15: the watchdog restarted idle-gated solo during a pool test.)
+  idle_gated=no
+  docker exec "$SVC" test -f /data/.pause-mining 2>/dev/null && idle_gated=yes
+
+  # --- idle-gate short-circuit: leave a DELIBERATELY-paused miner alone ---
+  if [ "$idle_gated" = "yes" ]; then
+    stall_samples=0; peer_zero=0   # flat counter + stale peers are expected while paused
+    [ $((cyc % 10)) -eq 0 ] && log "idle-gated (.pause-mining set): mining paused on purpose, skipping stall/peer recovery (h=$H gpu=${gpu}%)"
+  else
+
   # --- peering monitor + auto-remediation (idea #4) ---
   # A uniformly-STALE peer set is the dangerous case: every connected peer agrees
   # on an old tip, so chain-guard sees no median gap (should_pause stays false) and
@@ -91,8 +105,12 @@ while :; do
     fi
   else peer_zero=0; fi
 
-  # --- stall detection: at tip, NOT paused, but solve counter flat ---
-  if [ "$IBD" != "true" ] && [ "$paused" = "false" ] && [ "$d" -le 0 ] 2>/dev/null; then
+  # --- stall detection: node UP + at tip, NOT paused, but solve counter flat ---
+  # REQUIRE H>0 (RPC responding): during a warmup btxd's RPC is down (-28) so a
+  # flat counter is NOT a stall - restarting then would just relaunch the warmup
+  # (a warmup loop). A truly-dead container is caught by the container-status check
+  # above; an up-but-warming node must be left to finish.
+  if [ "$H" -gt 0 ] 2>/dev/null && [ "$IBD" != "true" ] && [ "$paused" = "false" ] && [ "$d" -le 0 ] 2>/dev/null; then
     stall_samples=$((stall_samples+1))
     if [ "$stall_samples" -ge "$stall_need" ]; then
       alert "ALERT" "STALL: solve counter flat ${STALL_MIN}m (delta=$d, gpu=${gpu}%) at h=$H/$HD, mining not paused"
@@ -110,10 +128,12 @@ while :; do
     [ "$d" -gt 0 ] 2>/dev/null && restarts=0   # healthy progress resets the restart budget
   fi
 
+  fi  # end idle-gate short-circuit
+
   # --- heartbeat (every ~10 samples) ---
   if [ $((cyc % 10)) -eq 0 ]; then
     kalive="$(pgrep -f empty-block-keeper.sh >/dev/null 2>&1 && echo yes || echo NO)"
     [ "$kalive" = "NO" ] && [ "$H" -lt 132000 ] 2>/dev/null && alert "WARN" "empty-block keeper not running while still in penalty window (h=$H<132000)"
-    log "ok h=$H/$HD ibd=$IBD paused=$paused solve+=$d gpu=${gpu}% near_tip_peers=$ntp keeper=$kalive restarts=$restarts"
+    log "ok h=$H/$HD ibd=$IBD paused=$paused idle_gated=$idle_gated solve+=$d gpu=${gpu}% near_tip_peers=$ntp keeper=$kalive restarts=$restarts"
   fi
 done
