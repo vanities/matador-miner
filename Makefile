@@ -81,14 +81,23 @@ matador: ## Switch to MATADOR — our custom pool miner. PAUSES solo's GPU minin
 	@BTX_PAYOUT_ADDRESS=$(POOL_ADDR) $(COMPOSE) --profile matador up -d --build matador
 	@echo "MATADOR mining (olé); solo node still UP with mining paused. Logs: make matador-logs   ·   Back to solo: make solo"
 
-solo: ## Switch back to SOLO mining — stops pool, then resumes solo GPU mining (no node restart if it was only paused)
+solo: ## Switch back to SOLO mining — stops pool, resumes solo GPU mining. NO node recreate if it's only idle-gated (no warmup)
 	@echo "Stopping POOL miners (freeing the GPU)..."
 	@$(COMPOSE) --profile pool stop btx-pool 2>/dev/null || true
 	@$(COMPOSE) --profile matador stop matador 2>/dev/null || true
-	@echo "Ensuring solo node is up, then resuming GPU mining (clearing the idle-gate flag)..."
-	@$(COMPOSE) up -d $(SVC)
-	@$(COMPOSE) exec -T $(SVC) rm -f $(DATADIR)/.pause-mining 2>/dev/null || true
-	@echo "Solo mining. If the node was only paused (not stopped), there's no warmup."
+	@# CRITICAL: do NOT `compose up -d` a running btx-miner — that can RECREATE it
+	@# (config-hash drift across invocations) and trigger a full shielded rebuild
+	@# warmup. If it's already up (the normal pool->solo case), JUST clear the idle
+	@# gate flag — no recreate, no warmup. Only `up -d` when it's genuinely down.
+	@if docker ps --filter name=^/$(SVC)$$ --filter status=running -q | grep -q .; then \
+	  echo "Solo node already up — clearing idle-gate flag (no recreate, no warmup)."; \
+	  $(COMPOSE) exec -T $(SVC) rm -f $(DATADIR)/.pause-mining 2>/dev/null || true; \
+	else \
+	  echo "Solo node not running — starting it (this incurs a one-time warmup)."; \
+	  $(COMPOSE) up -d $(SVC); sleep 5; \
+	  $(COMPOSE) exec -T $(SVC) rm -f $(DATADIR)/.pause-mining 2>/dev/null || true; \
+	fi
+	@echo "Solo mining resumed."
 
 stop-miner: ## Pause GPU mining (idle gate) - keeps btxd + node synced + keeper alive, NO warmup
 	@$(COMPOSE) exec -T $(SVC) touch $(DATADIR)/.pause-mining && echo "Miner paused; node stays up. Resume: make start-miner"
