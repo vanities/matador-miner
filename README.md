@@ -43,7 +43,9 @@ against, or to solo-mine end to end.
   `BTX_INSTALL_MODE=release` to run the signed prebuilt instead.
 - Mines to a wallet generated **inside your mounted `./btx-data`** so the wallet
   state and keys persist outside the container.
-- Publishes no ports and does not require any external wallet service.
+- Publishes the node RPC port only on host loopback (`127.0.0.1:19334`) so an
+  external miner can reach it via localhost or an SSH tunnel; cookie auth is still
+  required and nothing is exposed to the LAN/internet.
 
 ## Prerequisites (on the Linux box with the GPU)
 
@@ -77,8 +79,8 @@ miner**: it pulls work from **your own `btxd`** via `getblocktemplate`, solves o
 the node**, so updating the miner never restarts `btxd` (no shielded-state warmup, no lost
 propagation standing). Linux x86-64, NVIDIA Blackwell `sm_120` (RTX 5090).
 
-**One-line install** (downloads the latest release, verifies the sha256, installs to
-`/usr/local/bin`):
+**One-line install** (downloads the newest published release, including prereleases,
+verifies the sha256, installs to `/usr/local/bin`):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/vanities/matador-miner/main/install.sh | bash
@@ -89,7 +91,7 @@ Pin a version or change the install dir with env vars:
 [`install.sh`](install.sh), or do it by hand:
 
 ```bash
-api=https://api.github.com/repos/vanities/matador-miner/releases/latest
+api=https://api.github.com/repos/vanities/matador-miner/releases
 url=$(curl -fsSL "$api" | grep -oE '"browser_download_url": *"[^"]+linux-x86_64"' | cut -d'"' -f4)
 curl -fsSLO "$url" && curl -fsSLO "$url.sha256"          # binary + checksum
 sha256sum -c "$(basename "$url").sha256"                 # must print: OK

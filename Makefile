@@ -13,14 +13,19 @@ CLI  = $(COMPOSE) exec -T $(SVC) btx-cli -datadir=$(DATADIR)
 WCLI = $(CLI) -rpcwallet=$(WALLET)
 
 .DEFAULT_GOAL := help
-.PHONY: help up down restart logs stats status balance address gpu solo deploy stop-miner start-miner safe-stop safe-restart node shell cli backup restore reset clean check test
+.PHONY: help up down restart logs stats status balance address gpu solo deploy stop-miner start-miner safe-stop safe-restart node shell cli backup restore reset clean check test shell-check build-context-check
 
 help: ## List available targets
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | \
 		awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-9s\033[0m %s\n", $$1, $$2}'
 
-check: ## Repo sanity checks (e.g. Dockerfile COPY paths are git-tracked) — no Docker needed
+check: build-context-check shell-check ## Repo sanity checks — no Docker/GPU needed
+
+build-context-check: ## Dockerfile COPY/ADD sources are git-tracked
 	@bash scripts/check-build-context.sh
+
+shell-check: ## Syntax-check shell scripts and entrypoints
+	@bash scripts/check-shell-syntax.sh
 
 test: check ## Alias for `make check`
 

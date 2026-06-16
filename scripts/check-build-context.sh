@@ -15,14 +15,29 @@ cd "$(git rev-parse --show-toplevel)" || exit 2
 
 fail=0
 note() { printf '%s\n' "$*" >&2; }
+now_ms() {
+  if command -v python3 >/dev/null 2>&1; then
+    python3 - <<'PY'
+import time
+print(int(time.time() * 1000))
+PY
+  else
+    date +%s000
+  fi
+}
+
+start_ms=$(now_ms)
 
 # All tracked Dockerfiles (named Dockerfile or *.Dockerfile / Dockerfile.*).
-mapfile -t dockerfiles < <(git ls-files | grep -iE '(^|/)Dockerfile([.][^/]*)?$|[.]Dockerfile$' || true)
-if [ "${#dockerfiles[@]}" -eq 0 ]; then
+dockerfiles_tmp=$(mktemp "${TMPDIR:-/tmp}/btx-dockerfiles.XXXXXX") || exit 2
+trap 'rm -f "$dockerfiles_tmp"' EXIT
+
+git ls-files | grep -iE '(^|/)Dockerfile([.][^/]*)?$|[.]Dockerfile$' > "$dockerfiles_tmp" || true
+if [ ! -s "$dockerfiles_tmp" ]; then
   note "[check-build-context] no Dockerfiles tracked — nothing to check"; exit 0
 fi
 
-for df in "${dockerfiles[@]}"; do
+while IFS= read -r df; do
   note "[check-build-context] $df"
   # Read COPY/ADD lines (case-insensitive). We only care about copies FROM the
   # build context: skip `--from=` (those copy from another stage/image) and skip
@@ -60,11 +75,12 @@ for df in "${dockerfiles[@]}"; do
       fi
     done
   done < "$df"
-done
+done < "$dockerfiles_tmp"
 
 if [ "$fail" -ne 0 ]; then
   note ""
   note "[check-build-context] FAIL: a Dockerfile COPY/ADDs an untracked path."
   exit 1
 fi
-note "[check-build-context] OK: all Dockerfile COPY/ADD sources are tracked."
+elapsed=$(( $(now_ms) - start_ms ))
+note "[check-build-context] OK: all Dockerfile COPY/ADD sources are tracked in ${elapsed}ms."
