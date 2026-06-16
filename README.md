@@ -81,21 +81,26 @@ heartbeat, within seconds. That's it.
 Want the full bundle layout, Apple/AMD specifics, or the self-contained Docker node? See
 [Install the prebuilt miner](#install-the-prebuilt-miner-matador-miner) and the sections below.
 
-This repo also ships a sandboxed **Docker node + solo-miner** setup (`make solo`) that runs
-a pinned BTX full node and mines with the CUDA backend, keeping the node, miner, and wallet
-data isolated from the host - a turnkey way to run a node for the standalone miner to mine
-against, or to solo-mine end to end.
+---
+
+## Or: the all-in-one Docker node + miner (`make solo`)
+
+Everything above is the **standalone miner** - a single binary you point at any `btxd`. The
+rest of this README is the *other* way to use this repo: a **self-contained Docker stack**
+that runs its own pinned BTX full node **and** GPU solo-mines against it, with the node,
+miner, and wallet all sandboxed from your host. Reach for this if you'd rather run your own
+node end-to-end than mine against an existing one.
 
 > **Upstream / official node:** [`github.com/btxchain/btx`](https://github.com/btxchain/btx). Pinned to **v0.32.12** (commit [`f3c9eb77`](https://github.com/btxchain/btx/commit/f3c9eb77fa547a48862bc9bcec5f0d6acf4f0bb8)). This repo **compiles that exact commit from source** with the CUDA MatMul backend by choice - it guarantees native codegen for the supported NVIDIA arch set (`sm_80/86/89/90/120`) and a byte-reproducible build. To run the GPG-signed prebuilt instead, set `BTX_INSTALL_MODE=release` + `RELEASE_TAG=v0.32.12` in `docker-compose.yml`.
 >
 > **Consensus timeline (upgrade before each height or you fork off the network):** block **125,000** shielded sunset + MatMul nonce-seed **v2**; **130,000** temporary empty-block subsidy penalty; **130,500** MatMul seed-derivation **v3** (binds each nonce's seed to the parent block's `parent_mtp`); **132,000** forward consensus (shielded-exit velocity cap, empty-block penalty ends); **135,000** shielded-unshield velocity-cap quota ends (added in v0.32.12). 0.32.12 covers all of these.
 
-## What this does
+**What `make solo` does:**
 
-- Compiles `btxd` + `btx-cli` and the CUDA MatMul backend from a pinned upstream commit (**0.32.12**), in the Docker build.
-- Runs that BTX full node in Docker (archival, `prune=0`, so shielded-state rebuilds never fail).
+- Compiles `btxd` + `btx-cli` + the CUDA MatMul backend from a pinned commit (**0.32.12**) in the Docker build.
+- Runs that full node in Docker (archival, `prune=0`, so shielded-state rebuilds never fail).
 - Creates/uses a local wallet under `./btx-data`.
-- Starts a supervised GPU **solo**-mining loop using BTX's MatMul proof-of-work.
+- Runs a supervised GPU **solo**-mining loop on BTX's MatMul proof-of-work.
 
 ## Safety model (why this is the contained way to try it)
 
