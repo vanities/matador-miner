@@ -1,13 +1,24 @@
-# matador-miner - isolated GPU miner for `btxchain/btx`
+# matador-miner - a fast standalone miner for `btxchain/btx`
 
 ![MATADOR - fearless BTX MatMul miner](docs/matador.png)
 
-> **Solo mining** (`make solo`): a sandboxed BTX full node + CUDA MatMul miner pinned to
-> **0.32.11**, keeping 100% of every block it finds (no fee) plus our +22.9%
-> pipeline-overlap.
+A **standalone, decoupled** miner for the BTX MatMul proof-of-work: it pulls work from your
+own `btxd` (`getblocktemplate`), solves on the accelerator, and submits blocks - so updating
+the miner never restarts your node. Built to be fast (our +22.9% pipeline-overlap is baked
+in) and to keep 100% of every solo block (no pool fee).
 
-A Docker setup to point an idle NVIDIA GPU (e.g. an RTX 5090) at the `btxchain/btx` chain
-and mine, keeping the node, miner, and wallet data isolated from the host.
+**Backends**
+
+| Backend | Status |
+|---------|--------|
+| NVIDIA CUDA (single GPU, e.g. RTX 5090 / Blackwell `sm_120`) | working today |
+| NVIDIA multi-GPU | on the roadmap |
+| Apple Silicon (Metal) | on the roadmap (in progress) |
+
+This repo also ships a sandboxed **Docker node + solo-miner** setup (`make solo`) that runs
+a pinned BTX full node and mines with the CUDA backend, keeping the node, miner, and wallet
+data isolated from the host - a turnkey way to run a node for the standalone miner to mine
+against, or to solo-mine end to end.
 
 > **Upstream / official node:** [`github.com/btxchain/btx`](https://github.com/btxchain/btx). Pinned to **v0.32.11** (commit [`215170f2`](https://github.com/btxchain/btx/commit/215170f27f7d6889ce34aa7dbba2858ea07a468c)). This repo **compiles that exact commit from source** with the CUDA MatMul backend by choice - it guarantees native `sm_120` codegen for the 5090 and a byte-reproducible build. To run the GPG-signed prebuilt instead, set `BTX_INSTALL_MODE=release` + `RELEASE_TAG=v0.32.11` in `docker-compose.yml`.
 >
