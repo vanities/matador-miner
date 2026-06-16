@@ -74,11 +74,12 @@ RUN git init -q \
 # defaults it to 1; set 0 for a byte-exact serial A/B without rebuilding). If the
 # patch ever fails to apply against a future BTX_SOURCE_REF the build fails LOUDLY
 # here — re-derive it then. Disable with --build-arg APPLY_OVERLAP_PATCH=0 (stock
-# solver). Source lives in private/ (gitignored secret sauce) — it stays in the
-# build context locally + is synced to pc, so the live build sees it. A checkout
-# WITHOUT private/ cannot build this image (the COPY below requires it, by design).
+# solver). The patch is PUBLIC (btxchain/btx PR #72, src/pow.cpp only) so it is
+# TRACKED at node/patches/ — a plain checkout builds this image with no private/
+# dir needed. (The closed-source standalone miner stays in private/; only this
+# btxd scheduling patch is shipped in the tree.)
 ARG APPLY_OVERLAP_PATCH=1
-COPY private/matador-miner/patches-overlap/ /opt/btx-overlap/
+COPY node/patches/ /opt/btx-overlap/
 RUN if [ "${APPLY_OVERLAP_PATCH}" = "1" ]; then \
       echo "applying v3 pipeline-overlap patch (+22.9% live; src/pow.cpp only)"; \
       git apply --verbose /opt/btx-overlap/v3-pipeline-overlap.patch; \
