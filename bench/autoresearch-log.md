@@ -61,8 +61,12 @@ during the blocking run, so a TARGETED fix (mutex/stream around just the two ove
 launches, instead of global blocking) may push even higher than +29%.
 
 FIX (matador-miner): `--overlap` sets `BTX_MATMUL_PIPELINE_ASYNC=1` + `CUDA_LAUNCH_BLOCKING=1`.
-TODO before defaulting ON: byte-exact determinism A/B (serial vs overlap find identical
-nonces) - consensus-critical. Then flip default to ON.
+BYTE-EXACT: CONFIRMED on this build via btx-matmul-overlap-ab (PR #72 harness, rebuilt).
+Same v3 job serial vs overlap with CUDA_LAUNCH_BLOCKING=1 (shipped config): 24/24 found
+(nonce64,digest) pairs IDENTICAL -> "RESULT: BYTE-EXACT IDENTICAL". Use the PR params
+(--n 256 --nbits 0x207fffff --tries 48 ...); easy nbits + huge --tries floods CollectFinds
+(one SolveMatMul per find) and looks like a stall (it is just slow + buffered stdout).
+Overlap is now DEFAULT ON for CUDA in matador-miner v0.1.1 (validated, not inferred).
 TODO upstream: PR #72 needs the same launch-serialization guard or it stalls for non-btxd callers.
 
 ### Notes / ruled out at the instruction level (SASS-verified, do not retry)
@@ -72,3 +76,17 @@ TODO upstream: PR #72 needs the same launch-serialization guard or it stalls for
 - occupancy patch (`__launch_bounds__` + unroll): REJECTED earlier (-40%, ALU-bound).
 - async overlap pipeline: ~3% live at v3 (digest dominates), and stalls the
   standalone direct-call path -> matador-miner defaults overlap OFF.
+
+## Pool mode (stratum) - WORKING
+
+matador-miner `--mode pool` validated live against minebtx.com:3333: v18 handshake
+(subscribe declares `protocol_compliant:["pre_hash_block_tier_v18"]`, else 401) ->
+jobs -> solve at +31% overlap (~20k nonce/s) -> submit -> **ACCEPTED (0 rejects)**.
+Reuses SolveMatMul with share_target_override = notify param[6], parent_mtp from the
+job obj; nBits = param[5] is the loose pre-hash gate (matches killsquad client + pow.h).
+Endianness: prevhash/merkle/target via uint256::FromHex as-is, NO reversal (confirmed
+vs thekillsquad007 stratum_protocol.cpp). FIX that unblocked accepted shares: pool
+rejected "ntime drift Ns exceeds window" because SolveMatMul refreshes nTime mid-search
+(solo-correct). Pinned it in pool mode via BTX_MINER_HEADER_TIME_REFRESH_ATTEMPTS=
+UINT32_MAX (can't use 0 - ResolveMinerHeaderTimeRefreshAttempts requires >0). Solo
+keeps fresh-time. TODO: pool-mode dev-fee (time-based pool-account switch, Claymore-style).
