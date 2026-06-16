@@ -19,7 +19,7 @@ WALLET=miner
 EXPECTED_FPR="A8E17EF93249FCC3B8ACCF3D3A0454E5A6A8DC45"
 export BTX_MATMUL_BACKEND="${BTX_MATMUL_BACKEND:-cuda}"
 # How to obtain btxd/btx-cli:
-#   source  (default) — run the 0.32.2 binaries COMPILED INTO this image from the
+#   source  (default) — run the 0.32.12 binaries COMPILED INTO this image from the
 #                       pinned tag commit (see Dockerfile). No download, no GPG:
 #                       the image build is the trust boundary.
 #   release           — alt path: download + GPG-verify the signed precompiled

@@ -1,8 +1,8 @@
 name: ci
 
-# Catch build-context breakage (e.g. a Dockerfile COPY of a gitignored/untracked
-# path) before it reaches anyone who clones the repo. Pure static checks — no
-# Docker, no GPU, no secrets — so they run fast on every push and PR.
+# Catch build-context breakage and shell syntax errors before they reach anyone
+# who clones the repo. Pure static checks — no Docker, no GPU, no secrets — so
+# they run fast on every push and PR.
 on:
   push:
     branches: ["**"]
