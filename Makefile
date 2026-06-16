@@ -13,11 +13,16 @@ CLI  = $(COMPOSE) exec -T $(SVC) btx-cli -datadir=$(DATADIR)
 WCLI = $(CLI) -rpcwallet=$(WALLET)
 
 .DEFAULT_GOAL := help
-.PHONY: help up down restart logs stats status balance address gpu solo deploy stop-miner start-miner safe-stop safe-restart node shell cli backup restore reset clean
+.PHONY: help up down restart logs stats status balance address gpu solo deploy stop-miner start-miner safe-stop safe-restart node shell cli backup restore reset clean check test
 
 help: ## List available targets
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | \
 		awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-9s\033[0m %s\n", $$1, $$2}'
+
+check: ## Repo sanity checks (e.g. Dockerfile COPY paths are git-tracked) — no Docker needed
+	@bash scripts/check-build-context.sh
+
+test: check ## Alias for `make check`
 
 up: ## Build if needed and start the miner (detached)
 	$(COMPOSE) up -d --build
