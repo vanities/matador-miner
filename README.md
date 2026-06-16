@@ -27,8 +27,8 @@ Built to be fast (CUDA async overlap is baked in) and to keep solo blocks self-c
 
 > **AMD GPUs (Radeon / Instinct):** matador can hand HIP/ROCm solves to the companion
 > C++/HIP sidecar from [`amdbtx`](https://github.com/thekillsquad007/amdbtx). Build it with
-> `private/matador-miner/build-hip-sidecar.sh`, then run with `--backend hip` (or set
-> `MATADOR_HIP_SOLVER=/path/to/btx-gbt-solve-hip`). Same network, same pool - just the right
+> `private/matador-miner/build-hip-sidecar.sh`, then run with `--backend hip`; release bundles
+> auto-discover `bin/btx-gbt-solve-hip` next to the miner. Same network, same pool - just the right
 > solver for the hardware.
 > The sidecar build emits a fat HIP binary for common AMD code-object targets by default; set
 > `HIP_ARCHS="gfx1030 gfx1100"` to narrow the build for a known rig.
@@ -99,6 +99,24 @@ GPU, and submits with `submitblock`; pool mode talks directly to
 assets are CUDA fat binaries for `sm_80`, `sm_86`, `sm_89`, `sm_90`, and `sm_120`
 (Ampere through Blackwell); macOS arm64 assets use Metal.
 
+**Quick start (release bundle — recommended).** Each release ships a per-platform
+`*-bundle.tar.gz` with the miner, GPU-specific config templates, and (on Linux) the
+AMD/HIP sidecar. Grab your platform's bundle from the
+[latest release](https://github.com/vanities/matador-miner/releases), then:
+
+```bash
+# matador-miner-<ver>-linux-x86_64-bundle.tar.gz   NVIDIA CUDA + bundled AMD/HIP sidecar
+# matador-miner-<ver>-macos-arm64-bundle.tar.gz    Apple Metal
+curl -fsSLO "<bundle-url>" && curl -fsSLO "<bundle-url>.sha256"
+sha256sum -c matador-miner-*-bundle.tar.gz.sha256        # must print: OK  (shasum -a 256 on macOS)
+tar xzf matador-miner-*-bundle.tar.gz && cd matador-miner-*/
+cp config.example.nvidia.json matador.json    # or config.example.amd.json / config.example.mac.json
+$EDITOR matador.json                          # set your payout address + worker
+./bin/matador-miner                           # auto-loads ./matador.json and starts mining
+```
+
+Prefer just the bare binary? Use the one-liner below instead.
+
 **One-line install** (downloads the newest published release, including prereleases,
 verifies the sha256, installs to `/usr/local/bin`):
 
@@ -138,7 +156,7 @@ matador-miner \
   --mode pool \
   --pool stratum+tcp://stratum.minebtx.com:3333 \
   --worker rig1 \
-  --payoutaddress btx1...your-P2MR-address
+  --payoutaddress btx1zcf4z36asua8ylchysphgwfgyfr8267vvznth826epden7lar4fnqvy9gzv
 ```
 
 Useful minebtx links:
@@ -151,14 +169,18 @@ For unattended rigs, use a JSON config with ordered failover pools plus the loca
 API/watchdog:
 
 ```bash
-matador-miner --config /etc/matador-miner/config.json --api --api-port 4060
+cp config.example.nvidia.json matador.json   # or config.example.amd.json / config.example.mac.json
+$EDITOR matador.json                         # set payout address + worker
+./bin/matador-miner                          # auto-loads ./matador.json
 curl -s http://127.0.0.1:4060/health
 curl -s http://127.0.0.1:4060/summary   # shares, nonces, pools, watchdog, GPU temp/power/util
 curl -s http://127.0.0.1:4060/pools
 scripts/matador-status.sh                # readable dashboard for the same API
 ```
 
-See [`docs/matador-config.example.json`](docs/matador-config.example.json) and
+See [`docs/config.example.nvidia.json`](docs/config.example.nvidia.json),
+[`docs/config.example.amd.json`](docs/config.example.amd.json),
+[`docs/config.example.mac.json`](docs/config.example.mac.json), and
 [`docs/matador-standalone-ops.md`](docs/matador-standalone-ops.md).
 
 - **Solo + your keys only.** It submits to *your* `btxd` over **localhost RPC** and holds
@@ -171,7 +193,8 @@ See [`docs/matador-config.example.json`](docs/matador-config.example.json) and
 - **Warning-only thermal watchdog.** `/summary` and logs report GPU temp/power warnings, but
   the miner does not change clocks, fans, power limits, or restart itself.
 - **AMD/ROCm sidecar bridge.** `--backend hip` / `--backend rocm` delegates pool and solo
-  solves to the external C++/HIP `btx-gbt-solve-hip` sidecar (`MATADOR_HIP_SOLVER`).
+  solves to the external C++/HIP `btx-gbt-solve-hip` sidecar. Bundles auto-discover
+  `bin/btx-gbt-solve-hip`; use `--hip-solver` or config `sidecars.hip` only for custom layouts.
   If the sidecar is missing/fails, matador logs the reason and falls back to its in-process path.
   AMD telemetry can use `rocm-smi` when present.
 - Closed-source binary (AM2 LLC); **verify the sha256** before running. `LOG_LEVEL=debug`
