@@ -1,0 +1,21 @@
+name: ci
+
+# Catch build-context breakage (e.g. a Dockerfile COPY of a gitignored/untracked
+# path) before it reaches anyone who clones the repo. Pure static checks — no
+# Docker, no GPU, no secrets — so they run fast on every push and PR.
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # full history not needed, but we DO need the real tracked file set
+          # so git ls-files reflects exactly what a fresh clone contains.
+          fetch-depth: 1
+      - name: Repo sanity checks
+        run: make check
