@@ -69,6 +69,21 @@ if [ -n "${status:-}" ]; then
     printf 'nonce/s   : %d nonce-attempts/s  ·  %d digest-batches/s  (live, 4s sample)\n' \
       "$(( (N2-N1)/4 ))" "$(( (B2-B1)/4 ))"
   else
-    printf 'nonce/s   : (warming up — counters not advancing yet)\n'
+    printf 'nonce/s   : (no in-process solver activity — node-only/paused, or warming up)\n'
   fi
+fi
+
+# Optional, best-effort: if matador-miner is running as a separate process, surface
+# its last [stats] line. Node stats above are the point of `make stats`; this is a
+# nicety and silently skips when matador-miner isn't present. Point MINER_LOG at a
+# logfile, or it auto-detects a container named 'matador-miner'.
+mstats=""
+if [ -n "${MINER_LOG:-}" ] && [ -f "${MINER_LOG}" ]; then
+  mstats=$(grep -aF '[stats]' "$MINER_LOG" 2>/dev/null | tail -1)
+elif docker ps --filter name=matador-miner --format '{{.Names}}' 2>/dev/null | grep -q .; then
+  mstats=$(docker logs --tail 300 matador-miner 2>&1 | grep -aF '[stats]' | tail -1)
+fi
+if [ -n "$mstats" ]; then
+  cyan "MINER (matador-miner)"
+  printf '%s\n' "$mstats"
 fi

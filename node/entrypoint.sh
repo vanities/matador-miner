@@ -107,6 +107,12 @@ if [ ! -f "$DATADIR/btx.conf" ]; then
   cat > "$DATADIR/btx.conf" <<CONF
 server=1
 listen=1
+# Expose RPC to the docker bridge so a published host port can reach it (e.g. an
+# external Metal miner pulling GBT via an SSH tunnel). The published port is bound
+# to the host loopback in docker-compose; cookie auth is still enforced.
+rpcbind=0.0.0.0
+rpcallowip=127.0.0.1
+rpcallowip=172.16.0.0/12
 # Archival (prune=0): keep all blocks so RebuildShieldedState can never fail on a
 # pruned node — this is what caused the recurring shielded-state crash. ~119GB + ~1GB/day.
 prune=0
@@ -169,6 +175,11 @@ fi
 # load, so forcing it is safe. Idempotent: existing datadirs pick it up on next restart.
 grep -q '^allowunpinnedshieldedsnapshot=' "$DATADIR/btx.conf" 2>/dev/null \
   || echo 'allowunpinnedshieldedsnapshot=1' >> "$DATADIR/btx.conf"
+
+# RPC exposure for external miners (idempotent: existing datadirs pick it up on
+# the next btxd start). Cookie auth still required; published port is host-loopback.
+grep -q '^rpcbind=' "$DATADIR/btx.conf" 2>/dev/null \
+  || printf 'rpcbind=0.0.0.0\nrpcallowip=127.0.0.1\nrpcallowip=172.16.0.0/12\n' >> "$DATADIR/btx.conf"
 
 # 5) Briefly start the daemon to create YOUR wallet + payout address, then stop
 #    it — the mining loop supervises its own daemon.
