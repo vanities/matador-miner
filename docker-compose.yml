@@ -44,7 +44,7 @@ services:
       # double-rebuild and caused a restart loop on 2026-06-15.)
       BTX_RPC_STARTUP_ATTEMPTS: ${BTX_RPC_STARTUP_ATTEMPTS:-1800}
       # --- v3 solver pipeline-overlap knobs --------------------------------
-      # The overlap patch (private/matador-miner/patches-overlap/) is COMPILED INTO btx-miner:local
+      # The overlap patch (node/patches/v3-pipeline-overlap.patch) is COMPILED INTO btx-miner:local
       # by the Dockerfile, and async defaults to 1 so plain `make solo`/`make up`
       # run the validated +22.9% overlap. It is BYTE-EXACT vs serial (same found
       # nonces+digests), so on-by-default is safe. Set BTX_MATMUL_PIPELINE_ASYNC=0
