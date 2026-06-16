@@ -1,4 +1,4 @@
-# Minimal-downtime deploys (optimization #3)
+# Minimal-downtime deploys
 
 Version bumps are frequent on this chain (consensus changes every ~1-2 days). Each
 restart of the solo node costs a warmup gap - shielded-state load, any one-time state
@@ -11,8 +11,17 @@ The build is the long part (compiling btxd from source, minutes). Docker builds 
 image WITHOUT touching the running container, so `make deploy`:
 
 1. Builds the new `btx-miner` image while the current miner keeps mining.
-2. Swaps (recreates the container on the new image) only after the build succeeds.
-3. Polls the solve counter and prints the actual warmup gap (the real downtime).
+2. Waits for a clean, well-peered, at-tip window (`scripts/clean-stop.sh`) so the stop
+   flushes shielded state cleanly -> ~30s fast-restore next boot instead of a from-genesis
+   rebuild. The at-tip check is deterministic (blocks==headers, near-tip peers,
+   `reason=healthy`); it deliberately does NOT gate on `initialblockdownload`, which an
+   assumeutxo fast-start snapshot keeps `true` while its background validation grinds
+   (that false positive once burned the full clean-window timeout before swapping).
+3. Swaps (recreates the container on the new image) only after the build succeeds.
+4. Polls the solve counter and prints the actual warmup gap (the real downtime). NOTE: the
+   counter only moves when the container is GPU-mining - if you run the box node-only
+   (mining externally via matador-miner), `make deploy` will report "warming" until its
+   timeout even though the node is up; check `make status` / `getnetworkinfo` subversion.
 
 A failed build never takes the miner down, and the only downtime is the warmup, not the
 build. Use it for every version bump instead of a manual `up -d --build`:
@@ -22,8 +31,9 @@ build. Use it for every version bump instead of a manual `up -d --build`:
 
 ## Warm standby (gated on the measured warmup)
 
-If `make deploy` shows the warmup gap is painful on EVERY bump (not just the one-time
-0.32.11 velocity-state rebuild), the next lever is a pre-synced, node-only warm standby:
+If `make deploy` shows the warmup gap is painful on EVERY bump (not just a one-time
+state rebuild like the 0.32.11 velocity-state cutover), the next lever is a pre-synced,
+node-only warm standby:
 
 - Run a second btxd (node-only, no GPU) on a SEPARATE datadir, kept synced and warm.
 - On a bump: build the new image, restart the STANDBY on it (it warms in the background
@@ -35,4 +45,4 @@ If `make deploy` shows the warmup gap is painful on EVERY bump (not just the one
 Cost: a second datadir (cheap today - the chain is only ~117 MB), a little CPU/network to
 keep it synced, and the swap orchestration. NOT built yet on purpose: measure the real
 per-bump warmup with `make deploy` first. If normal restarts turn out to be fast (i.e. the
-heavy part was only the one-time 0.32.11 state rebuild), the standby is unnecessary.
+heavy part was only a one-time state rebuild), the standby is unnecessary.

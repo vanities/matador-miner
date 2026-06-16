@@ -90,7 +90,7 @@ deploy: ## Minimal-downtime version bump: build new image WHILE mining continues
 	    fi; \
 	    echo "[deploy]   ...warming $$(($$(date +%s)-t0))s"; \
 	  done; \
-	  echo "[deploy] if this gap recurs on every bump (not just the one-time 0.32.11 rebuild), see docs/minimal-downtime-deploy.md"
+	  echo "[deploy] if this gap recurs on every bump (not just a one-time state rebuild), see docs/minimal-downtime-deploy.md"
 
 node: ## Run the node ONLY (wallet + RPC, no mining, no GPU compute) — e.g. to run an external miner against it
 	@echo "Starting NODE-ONLY btxd: wallet + RPC, no mining, no GPU compute."
