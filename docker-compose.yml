@@ -55,7 +55,13 @@ services:
       BTX_MATMUL_GPU_INPUTS: ${BTX_MATMUL_GPU_INPUTS:-}
     volumes:
       - ./btx-data:/data           # blockchain + YOUR wallet (self-custody) — back this up
-    # Intentionally NO published ports: the RPC interface stays inside the container.
+    ports:
+      # Expose btxd JSON-RPC, bound to the HOST loopback only (not the LAN/internet).
+      # Reach it from another machine over an SSH tunnel: `ssh -L 19334:localhost:19334 pc`.
+      # btxd still requires cookie auth; entrypoint adds rpcbind/rpcallowip so the
+      # docker-proxy (which connects from the bridge gateway) is accepted.
+      # Lets an external miner (e.g. the M4 Max Metal solver) pull GBT work.
+      - "127.0.0.1:19334:19334"
 
   # NOTE: the old pool (btx-pool, official btx-gbt-solve) and fork (matador,
   # thekillsquad007/btx-nvidia-miner) services were REMOVED 2026-06-15 - superseded
