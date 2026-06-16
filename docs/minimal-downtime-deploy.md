@@ -5,6 +5,13 @@ restart of the solo node costs a warmup gap - shielded-state load, any one-time 
 rebuild, and sync catch-up - during which the GPU is NOT mining. At ~90s block spacing
 and our ~0.3-0.4% share, ~10 min of warmup is roughly 7 blocks of lost opportunity.
 
+> **Update (2026-06-16):** this "GPU not mining during warmup" cost applies to **in-node /
+> solo** mining. The pc now mines **pool** via a **host-native `matador-miner`** that is
+> decoupled from the container (see `private/README.md`), so a node restart / `make deploy`
+> no longer stops mining — the warmup gap costs node availability + solo-readiness, not pool
+> hashrate. (Solo mode still pulls `getblocktemplate` from `btxd`, so the gap below applies
+> there.)
+
 ## Build-then-swap: `make deploy`
 
 The build is the long part (compiling btxd from source, minutes). Docker builds the new

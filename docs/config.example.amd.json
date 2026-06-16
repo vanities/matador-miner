@@ -1,0 +1,39 @@
+{
+  "mode": "pool",
+  "pools": [
+    {
+      "label": "shibs-minebtx",
+      "url": "stratum+tcp://stratum.minebtx.com:3333"
+    }
+  ],
+  "worker": "amd-rig1",
+  "pool_pass": "x",
+  "payoutaddress": "btx1zcf4z36asua8ylchysphgwfgyfr8267vvznth826epden7lar4fnqvy9gzv",
+  "chain": "main",
+  "backend": "hip",
+  "sidecars": {
+    "hip": "./bin/btx-gbt-solve-hip"
+  },
+  "api": {
+    "enabled": true,
+    "listen": "127.0.0.1",
+    "port": 4060
+  },
+  "watchdog": {
+    "enabled": true,
+    "check_s": 15,
+    "reject_streak": 20,
+    "no_share_s": 0
+  },
+  "thermal": {
+    "enabled": true,
+    "warn_temp_c": 86,
+    "critical_temp_c": 90,
+    "warn_power_w": 0
+  },
+  "dev_fee": 1,
+  "solver_threads": 1,
+  "overlap": true,
+  "update_check": true,
+  "auto_update": true
+}

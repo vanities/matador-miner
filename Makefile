@@ -13,19 +13,28 @@ CLI  = $(COMPOSE) exec -T $(SVC) btx-cli -datadir=$(DATADIR)
 WCLI = $(CLI) -rpcwallet=$(WALLET)
 
 .DEFAULT_GOAL := help
-.PHONY: help up down restart logs stats status balance address gpu solo deploy stop-miner start-miner safe-stop safe-restart node shell cli backup restore reset clean check test shell-check build-context-check
+.PHONY: help up down restart logs stats status matador-status balance address gpu solo deploy stop-miner start-miner safe-stop safe-restart node shell cli backup restore reset clean check test shell-check build-context-check matador-config-check matador-bundle
 
 help: ## List available targets
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | \
 		awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-9s\033[0m %s\n", $$1, $$2}'
 
-check: build-context-check shell-check ## Repo sanity checks — no Docker/GPU needed
+check: build-context-check shell-check matador-config-check ## Repo sanity checks — no Docker/GPU needed
 
 build-context-check: ## Dockerfile COPY/ADD sources are git-tracked
 	@bash scripts/check-build-context.sh
 
 shell-check: ## Syntax-check shell scripts and entrypoints
 	@bash scripts/check-shell-syntax.sh
+
+matador-config-check: ## Validate standalone matador-miner config fixtures/source (skips private source when absent)
+	@bash scripts/check-matador-config.sh
+
+matador-bundle: ## Package dist/matador-miner plus optional sidecars into a release tarball
+	@bash private/matador-miner/package-bundle.sh
+
+matador-status: ## Read local matador-miner API summary (MATADOR_API_URL overrides)
+	@bash scripts/matador-status.sh
 
 test: check ## Alias for `make check`
 

@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# install.sh - download, verify (sha256), and install the latest matador-miner.
+# install.sh - download, verify (sha256), smoke-test, and install matador-miner.
 #
 #   curl -fsSL https://raw.githubusercontent.com/vanities/matador-miner/main/install.sh | bash
 #
 # Env options:
-#   VERSION=v0.1.0          install a specific tag (default: latest release)
+#   VERSION=v0.3.0          install a specific tag (default: newest release incl. prereleases)
 #   PREFIX=$HOME/.local/bin install dir (default: /usr/local/bin via sudo, else ~/.local/bin)
 #   REPO=owner/name         override the source repo (default: vanities/matador-miner)
 set -euo pipefail
@@ -18,18 +18,23 @@ if   command -v sha256sum >/dev/null; then SHACHK="sha256sum"
 elif command -v shasum    >/dev/null; then SHACHK="shasum -a 256"
 else die "need sha256sum or shasum to verify the download"; fi
 
+case "$(uname -s)-$(uname -m)" in
+  Linux-x86_64) asset_pattern='linux-x86_64' ;;
+  Darwin-arm64) asset_pattern='macos-arm64' ;;
+  *) die "unsupported platform $(uname -s)-$(uname -m); expected Linux x86_64 or macOS arm64" ;;
+esac
+
 if [ -n "${VERSION:-}" ]; then
   api="https://api.github.com/repos/$REPO/releases/tags/$VERSION"
 else
-  # /releases (newest-first, INCLUDES prereleases) - not /releases/latest, which
-  # skips prereleases. The first linux-x86_64 asset below is the newest release's.
+  # /releases is newest-first and includes prereleases. /releases/latest skips prereleases.
   api="https://api.github.com/repos/$REPO/releases"
 fi
 
 log "resolving release: $api"
 json="$(curl -fsSL "$api")" || die "cannot reach the GitHub API (is a release published yet?)"
-url="$(printf '%s' "$json" | grep -oE '"browser_download_url": *"[^"]+linux-x86_64"' | cut -d'"' -f4 | head -1)"
-[ -n "$url" ] || die "no linux-x86_64 binary asset found in that release"
+url="$(printf '%s' "$json" | grep -oE '"browser_download_url": *"[^"]+'"$asset_pattern"'"' | cut -d'"' -f4 | head -1)"
+[ -n "$url" ] || die "no $asset_pattern binary asset found in that release"
 asset="$(basename "$url")"
 
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
@@ -41,6 +46,16 @@ log "verifying checksum"
 ( cd "$tmp" && $SHACHK -c "$asset.sha256" >/dev/null ) || die "CHECKSUM MISMATCH - refusing to install"
 log "checksum OK"
 chmod +x "$tmp/$asset"
+
+log "smoke-testing binary"
+"$tmp/$asset" --help >/dev/null || die "downloaded binary failed --help smoke test"
+if [ "$asset_pattern" = linux-x86_64 ]; then
+  if command -v nvidia-smi >/dev/null 2>&1; then
+    nvidia-smi --query-gpu=name,driver_version --format=csv,noheader | sed 's/^/[install] nvidia: /' >&2 || true
+  else
+    log "nvidia-smi not found; skipping NVIDIA driver visibility check"
+  fi
+fi
 
 # Pick an install dir: explicit PREFIX, else /usr/local/bin (sudo), else ~/.local/bin.
 if [ -n "${PREFIX:-}" ]; then
@@ -56,4 +71,5 @@ fi
 
 log "installed -> $dst/matador-miner"
 case ":$PATH:" in *":$dst:"*) ;; *) log "NOTE: add $dst to your PATH";; esac
-log "next: matador-miner --help   (needs a synced btxd v0.32.12+ with RPC)"
+log "next: matador-miner --help"
+log "pool example: matador-miner --mode pool --pool stratum+tcp://stratum.minebtx.com:3333 --worker rig1 --payoutaddress btx1zcf4z36asua8ylchysphgwfgyfr8267vvznth826epden7lar4fnqvy9gzv --api --api-port 4060"
