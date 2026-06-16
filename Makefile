@@ -13,7 +13,7 @@ CLI  = $(COMPOSE) exec -T $(SVC) btx-cli -datadir=$(DATADIR)
 WCLI = $(CLI) -rpcwallet=$(WALLET)
 
 .DEFAULT_GOAL := help
-.PHONY: help up down restart logs stats status balance address gpu bench validate bench-full solo deploy stop-miner start-miner safe-stop safe-restart node shell cli backup restore reset clean
+.PHONY: help up down restart logs stats status balance address gpu solo deploy stop-miner start-miner safe-stop safe-restart node shell cli backup restore reset clean
 
 help: ## List available targets
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | \
@@ -46,15 +46,6 @@ address: ## Show the mining payout address
 
 gpu: ## GPU utilization / power / temp (host nvidia-smi)
 	@nvidia-smi --query-gpu=utilization.gpu,power.draw,temperature.gpu --format=csv,noheader
-
-bench: ## A/B the solver across images in v2 (live-representative) mode; pauses miner
-	@bash bench/ab.sh
-
-validate: ## CORRECTNESS gate (btx-dev suite): byte-exact CUDA-vs-CPU parity + compute-sanitizer memcheck/synccheck/racecheck. Run before ANY kernel deploy.
-	@bash bench/validate.sh
-
-bench-full: ## Full gate: validate (correctness) THEN v3 config sweep (throughput). The complete "is this kernel change safe + faster" check.
-	@bash bench/validate.sh && bash bench/v3-config-sweep.sh
 
 solo: ## Resume/start SOLO mining. NO node recreate if it's only idle-gated (no warmup)
 	@# CRITICAL: do NOT `compose up -d` a running btx-miner — that can RECREATE it
