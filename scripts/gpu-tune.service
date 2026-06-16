@@ -1,5 +1,5 @@
 # btx-miner GPU efficiency tuning — persists the undervolt-equivalent across reboots.
-# Tuned optimum (see bench/baseline.md + sweep): lock graphics clock 0-2600 MHz and
+# Tuned optimum (from a power/clock sweep): lock graphics clock 0-2600 MHz and
 # cap power at 520 W -> ~346 W actual draw at ~99% of the locked-clock hashrate,
 # vs ~571 W stock. nonces/watt is the target metric, not peak hashrate.
 #
