@@ -6,7 +6,7 @@
 set -euo pipefail
 
 DATADIR=/data
-RELEASE_TAG="${RELEASE_TAG:-v0.32.2}"
+RELEASE_TAG="${RELEASE_TAG:-v0.32.12}"
 PLATFORM="${BTX_PLATFORM:-linux-x86_64-cuda13}"
 INSTALL_DIR="$DATADIR/btx-bin"
 SRC=/opt/btx-src
@@ -23,7 +23,7 @@ export BTX_MATMUL_BACKEND="${BTX_MATMUL_BACKEND:-cuda}"
 #                       pinned tag commit (see Dockerfile). No download, no GPG:
 #                       the image build is the trust boundary.
 #   release           — alt path: download + GPG-verify the signed precompiled
-#                       release named by RELEASE_TAG (set RELEASE_TAG=v0.32.2).
+#                       release named by RELEASE_TAG (set RELEASE_TAG=v0.32.12).
 BTX_INSTALL_MODE="${BTX_INSTALL_MODE:-source}"
 
 log(){ printf '\n\033[1;36m[btx-miner]\033[0m %s\n' "$*"; }

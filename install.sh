@@ -56,4 +56,4 @@ fi
 
 log "installed -> $dst/matador-miner"
 case ":$PATH:" in *":$dst:"*) ;; *) log "NOTE: add $dst to your PATH";; esac
-log "next: matador-miner --help   (needs a synced btxd v0.32.11+ with RPC)"
+log "next: matador-miner --help   (needs a synced btxd v0.32.12+ with RPC)"

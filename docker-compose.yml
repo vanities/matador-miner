@@ -4,17 +4,17 @@ services:
       context: .
       dockerfile: node/Dockerfile
       args:
-        # 0.32.11 compiled from source (native sm_120 codegen for the 5090; byte-
-        # reproducible from a pinned tag commit). 0.32.11 = btx-node sync that HARDENS
-        # MatMul v3 parent-MTP seed handling across CPU/Metal/CUDA: GPU nonce prehash
-        # scanning now carries the active seed version + parent median-time-past, so the
-        # accelerated miner verifies the SAME seed scope as consensus. Fixes the v3 GPU
-        # solver stall we hit on 0.32.10 (its CUDA path didn't carry parent_mtp at height
-        # >=130,500). Keeps the 130,500 v3 binding + 130,000 empty-block rule; ADDS forward
-        # consensus at height 132,000 (velocity cap, empty-block penalty end, recovery-exit)
-        # - upgrade before 132,000. 0.32.11 itself touches src/cuda/oracle_accel.cu (the
-        # fix); our PR#58 patches stay OFF (already upstreamed; APPLY_LOCAL_PATCHES=0).
-        BTX_SOURCE_REF: 215170f27f7d6889ce34aa7dbba2858ea07a468c
+        # 0.32.12 compiled from source (native sm_120 codegen for the 5090; byte-
+        # reproducible from a pinned tag commit). 0.32.12 is a CONSENSUS-only follow-up
+        # to 0.32.11 (NO src/cuda or src/metal changes - our stock build is unaffected):
+        # it MOVES the shielded-unshield (z->t) velocity-cap EXIT from height 132,000 to
+        # 135,000 (the quota now ends after the recovery window) and ships v9 assumeutxo
+        # snapshots at heights 132,142-132,209 - i.e. the live chain is already PAST
+        # 132,000, so 0.32.12 is required to stay on the canonical chain through 135,000.
+        # Inherits everything from 0.32.11 (130,000 empty-block rule, 130,500 v3 parent-MTP
+        # seed binding, the v3 CUDA stall fix). Our PR#58 patches stay OFF (already
+        # upstreamed; APPLY_LOCAL_PATCHES=0).
+        BTX_SOURCE_REF: f3c9eb77fa547a48862bc9bcec5f0d6acf4f0bb8
         BTX_CUDA_ARCHITECTURES: "120"   # sm_120 = RTX 5090 (Blackwell)
         # Our six PR #58 CUDA patches were upstreamed into 0.32.8, so the local
         # patches are OFF by default now (APPLY_LOCAL_PATCHES=0 in the Dockerfile).
@@ -25,9 +25,9 @@ services:
     stop_grace_period: 120s        # give btxd time to flush cleanly on stop (entrypoint traps SIGTERM)
     gpus: all                      # requires nvidia-container-toolkit on the host
     environment:
-      # source  = run the 0.32.11 binaries compiled into the image (default).
+      # source  = run the 0.32.12 binaries compiled into the image (default).
       # release = download + GPG-verify the signed precompiled release instead;
-      #           for that, also set RELEASE_TAG=v0.32.11 here.
+      #           for that, also set RELEASE_TAG=v0.32.12 here.
       BTX_INSTALL_MODE: source
       BTX_MATMUL_BACKEND: cuda
       # 1 (default) = node + GPU mining (solo). 0 = NODE-ONLY: run btxd for the

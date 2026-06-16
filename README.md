@@ -20,13 +20,13 @@ a pinned BTX full node and mines with the CUDA backend, keeping the node, miner,
 data isolated from the host - a turnkey way to run a node for the standalone miner to mine
 against, or to solo-mine end to end.
 
-> **Upstream / official node:** [`github.com/btxchain/btx`](https://github.com/btxchain/btx). Pinned to **v0.32.11** (commit [`215170f2`](https://github.com/btxchain/btx/commit/215170f27f7d6889ce34aa7dbba2858ea07a468c)). This repo **compiles that exact commit from source** with the CUDA MatMul backend by choice - it guarantees native `sm_120` codegen for the 5090 and a byte-reproducible build. To run the GPG-signed prebuilt instead, set `BTX_INSTALL_MODE=release` + `RELEASE_TAG=v0.32.11` in `docker-compose.yml`.
+> **Upstream / official node:** [`github.com/btxchain/btx`](https://github.com/btxchain/btx). Pinned to **v0.32.12** (commit [`f3c9eb77`](https://github.com/btxchain/btx/commit/f3c9eb77fa547a48862bc9bcec5f0d6acf4f0bb8)). This repo **compiles that exact commit from source** with the CUDA MatMul backend by choice - it guarantees native `sm_120` codegen for the 5090 and a byte-reproducible build. To run the GPG-signed prebuilt instead, set `BTX_INSTALL_MODE=release` + `RELEASE_TAG=v0.32.12` in `docker-compose.yml`.
 >
-> **Consensus timeline (upgrade before each height or you fork off the network):** block **125,000** shielded sunset + MatMul nonce-seed **v2**; **130,000** temporary empty-block subsidy penalty; **130,500** MatMul seed-derivation **v3** (binds each nonce's seed to the parent block's `parent_mtp`); **132,000** forward consensus (shielded-exit velocity cap, empty-block penalty ends). 0.32.11 covers all of these.
+> **Consensus timeline (upgrade before each height or you fork off the network):** block **125,000** shielded sunset + MatMul nonce-seed **v2**; **130,000** temporary empty-block subsidy penalty; **130,500** MatMul seed-derivation **v3** (binds each nonce's seed to the parent block's `parent_mtp`); **132,000** forward consensus (shielded-exit velocity cap, empty-block penalty ends); **135,000** shielded-unshield velocity-cap quota ends (added in v0.32.12). 0.32.12 covers all of these.
 
 ## What this does
 
-- Compiles `btxd` + `btx-cli` and the CUDA MatMul backend from a pinned upstream commit (**0.32.11**), in the Docker build.
+- Compiles `btxd` + `btx-cli` and the CUDA MatMul backend from a pinned upstream commit (**0.32.12**), in the Docker build.
 - Runs that BTX full node in Docker (archival, `prune=0`, so shielded-state rebuilds never fail).
 - Creates/uses a local wallet under `./btx-data`.
 - Starts a supervised GPU **solo**-mining loop using BTX's MatMul proof-of-work.
@@ -34,7 +34,7 @@ against, or to solo-mine end to end.
 ## Safety model (why this is the contained way to try it)
 
 - Runs entirely in a container; the node/miner cannot see your host filesystem.
-- **Source build:** compiles a single, pinned, immutable commit (0.32.11) from
+- **Source build:** compiles a single, pinned, immutable commit (0.32.12) from
   [`github.com/btxchain/btx`](https://github.com/btxchain/btx). The signed
   release key is integrity-only (self-published, no independent vouching), so
   commit pinning is comparable trust - and a native `sm_120` compile is better
@@ -58,7 +58,7 @@ against, or to solo-mine end to end.
 
 ```bash
 # copy this folder to the Linux box, then:
-make solo        # build (first run) + solo-mine on 0.32.11
+make solo        # build (first run) + solo-mine on 0.32.12
 make help        # all targets: up/down/logs/status/balance/backup/restore/deploy/...
 ```
 
@@ -97,7 +97,7 @@ chmod +x "$(basename "$url")" && sudo mv "$(basename "$url")" /usr/local/bin/mat
 matador-miner --help
 ```
 
-**Run it** against a synced `btxd` (this repo's `make node`, or any `btxd` v0.32.11+ with
+**Run it** against a synced `btxd` (this repo's `make node`, or any `btxd` v0.32.12+ with
 RPC enabled):
 
 ```bash
@@ -153,7 +153,7 @@ docker compose exec btx-miner btx-cli -datadir=/data -rpcwallet=miner getbalance
 cat ./btx-data/miner-address.txt                                                  # your reward address
 ```
 
-## Fast-start / snapshot (0.32.11)
+## Fast-start / snapshot (0.32.12)
 
 The entrypoint loads an assumeutxo snapshot to skip most of the initial sync. 0.32.11 added
 consensus pins for shielded snapshots, so the bundled fast-start snapshot loads only with
@@ -186,7 +186,7 @@ btx-cli -datadir=/data -rpcwallet=miner getnewaddress
 
 To build a different commit, change `BTX_SOURCE_REF` in `docker-compose.yml`.
 To run the signed precompiled release instead, set `BTX_INSTALL_MODE=release`
-and `RELEASE_TAG=v0.32.11`; the entrypoint then runs the upstream `faststart`
+and `RELEASE_TAG=v0.32.12`; the entrypoint then runs the upstream `faststart`
 installer (see `doc/linux-release-builds.md`).
 
 ## Power use
