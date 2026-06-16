@@ -44,7 +44,9 @@ Linux x86-64 (NVIDIA CUDA, with the AMD/HIP sidecar in the bundle) and macOS arm
 curl -fsSL https://raw.githubusercontent.com/vanities/matador-miner/main/install.sh | bash
 ```
 
-**2. Pool-mine** - no node to run, just point it at the pool with your payout address:
+**2. Mine** - pick one:
+
+**Pool** - no node to run, just point it at the pool with your payout address:
 
 ```bash
 matador-miner --mode pool \
@@ -53,10 +55,30 @@ matador-miner --mode pool \
   --payoutaddress btx1...your-btx-address
 ```
 
-You should see `accepted` shares and a `nonce/s` / `scan=…MN/s` heartbeat within seconds. That's it.
+**Solo** - against your own synced `btxd` (this repo's `make solo`, or any `btxd` v0.32.12+ with
+RPC on); you keep 100% of every block, no pool fee:
 
-Want the bundle (miner + config templates + AMD sidecar), solo mining against your own `btxd`,
-Apple/AMD specifics, or the self-contained Docker node? See
+```bash
+matador-miner \
+  --payoutaddress btx1...your-btx-address \
+  --rpccookiefile ~/.btx/.cookie        # or --rpcuser/--rpcpassword
+# solo is the default mode; add --rpcconnect 127.0.0.1 --rpcport 19334 if btxd isn't on the defaults
+```
+
+**Prefer a config file?** The release bundles ship `config.example.nvidia.json`,
+`config.example.amd.json`, and `config.example.mac.json` - copy the one for your GPU, set your
+payout/worker, and just run (it auto-loads `./matador.json`):
+
+```bash
+cp config.example.nvidia.json matador.json   # or config.example.amd.json / .mac.json
+$EDITOR matador.json                          # set payout address + worker
+./bin/matador-miner
+```
+
+You should see `accepted` shares (pool) or a block search, with a `nonce/s` / `scan=…MN/s`
+heartbeat, within seconds. That's it.
+
+Want the full bundle layout, Apple/AMD specifics, or the self-contained Docker node? See
 [Install the prebuilt miner](#install-the-prebuilt-miner-matador-miner) and the sections below.
 
 This repo also ships a sandboxed **Docker node + solo-miner** setup (`make solo`) that runs
