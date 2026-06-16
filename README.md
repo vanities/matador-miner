@@ -309,6 +309,24 @@ A 5090 mining full-tilt draws ~0.5 kW, roughly **$1-2/day** in electricity. For 
 nonces/watt rather than peak rate, `scripts/gpu-tune.service` locks the clock + caps power
 (~346 W at ~99% of the hashrate); install it per the comments in that file.
 
+## Help wanted - benchmarks & testing
+
+Only the RTX 5090 is benchmarked here. The CUDA binary ships codegen for Ampere/Ada/Hopper
+too, and the AMD/HIP sidecar is **built but not yet validated on real AMD hardware** - so if
+you run it on anything else, your numbers genuinely help:
+
+- **NVIDIA (any `sm_80`-`sm_120` card):** the `nonce/s` and `scan=...MN/s` from the `[stats]`
+  line, plus your card + driver version.
+- **AMD (RDNA / CDNA, `--backend hip`):** confirm the bundled `btx-gbt-solve-hip` solves and
+  lands shares, with your GPU + ROCm version. (On ROCm 6.x, build the sidecar from
+  [amdbtx](https://github.com/thekillsquad007/amdbtx) and point `--hip-solver` at it.)
+- **Apple Silicon (M1-M5, `--backend metal`):** `nonce/s` / `scan` per chip.
+
+Easiest way to share: `scripts/matador-status.sh` (or `curl -s http://127.0.0.1:4060/summary`)
+prints a clean rig snapshot - open an issue with that output + your OS/driver, or PR a row into
+the rates table at the top. Bug reports and weird-hardware/driver/pool edge cases are just as
+welcome.
+
 ## Credits / thanks
 
 This repo is just packaging + tuning on top of other people's hard work. Thanks to:
