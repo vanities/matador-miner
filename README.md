@@ -2,25 +2,43 @@
 
 ![MATADOR - fearless BTX MatMul miner](docs/matador.png)
 
-A **standalone, decoupled** miner for the BTX MatMul proof-of-work: it pulls work from your
-own `btxd` (`getblocktemplate`), solves on the accelerator, and submits blocks - so updating
-the miner never restarts your node. Built to be fast (our +22.9% pipeline-overlap is baked
-in) and to keep 100% of every solo block (no pool fee).
+A **standalone, decoupled** miner for the BTX MatMul proof-of-work. It can solo-mine
+against your own `btxd` (`getblocktemplate` -> `submitblock`) or pool-mine directly
+against [minebtx](https://minebtx.com/) / dexbtx-style pools, so updating the miner never restarts your node.
+Built to be fast (CUDA async overlap is baked in) and to keep solo blocks self-custodied.
 
 **Backends**
 
 | Backend | Status |
 |---------|--------|
-| NVIDIA CUDA (single GPU, e.g. RTX 5090 / Blackwell `sm_120`) | working today |
+| NVIDIA CUDA single-GPU fat binary (`sm_80`, `sm_86`, `sm_89`, `sm_90`, `sm_120`) | working today |
 | NVIDIA multi-GPU | on the roadmap |
-| Apple Silicon (Metal) | on the roadmap (in progress) |
+| Apple Silicon (Metal) | working |
+| AMD (HIP/ROCm) | sidecar bridge to companion C++/HIP solver [`amdbtx`](https://github.com/thekillsquad007/amdbtx) |
+
+**Estimated BTX MatMul rates**
+
+| Hardware | Backend | Estimated rate | Notes |
+|----------|---------|----------------|-------|
+| NVIDIA RTX 5090 / Blackwell `sm_120` | CUDA | ~19.5k-20.5k nonce/s | Live `matador-miner` pool rate on `pc` with async overlap on. |
+| Apple M4 Max | Metal | ~1.1k-1.3k nonce/s | Working macOS arm64 build; useful for dev / spare-Mac mining. |
+| Other NVIDIA CUDA GPUs | CUDA | not benchmarked here | Release binaries include Ampere/Ada/Hopper/Blackwell cubins: `sm_80`, `sm_86`, `sm_89`, `sm_90`, `sm_120`. Measure locally. |
+| Multiple NVIDIA GPUs | CUDA | not available yet | True multi-GPU scheduling is still roadmap. |
+
+> **AMD GPUs (Radeon / Instinct):** matador can hand HIP/ROCm solves to the companion
+> C++/HIP sidecar from [`amdbtx`](https://github.com/thekillsquad007/amdbtx). Build it with
+> `private/matador-miner/build-hip-sidecar.sh`, then run with `--backend hip` (or set
+> `MATADOR_HIP_SOLVER=/path/to/btx-gbt-solve-hip`). Same network, same pool - just the right
+> solver for the hardware.
+> The sidecar build emits a fat HIP binary for common AMD code-object targets by default; set
+> `HIP_ARCHS="gfx1030 gfx1100"` to narrow the build for a known rig.
 
 This repo also ships a sandboxed **Docker node + solo-miner** setup (`make solo`) that runs
 a pinned BTX full node and mines with the CUDA backend, keeping the node, miner, and wallet
 data isolated from the host - a turnkey way to run a node for the standalone miner to mine
 against, or to solo-mine end to end.
 
-> **Upstream / official node:** [`github.com/btxchain/btx`](https://github.com/btxchain/btx). Pinned to **v0.32.12** (commit [`f3c9eb77`](https://github.com/btxchain/btx/commit/f3c9eb77fa547a48862bc9bcec5f0d6acf4f0bb8)). This repo **compiles that exact commit from source** with the CUDA MatMul backend by choice - it guarantees native `sm_120` codegen for the 5090 and a byte-reproducible build. To run the GPG-signed prebuilt instead, set `BTX_INSTALL_MODE=release` + `RELEASE_TAG=v0.32.12` in `docker-compose.yml`.
+> **Upstream / official node:** [`github.com/btxchain/btx`](https://github.com/btxchain/btx). Pinned to **v0.32.12** (commit [`f3c9eb77`](https://github.com/btxchain/btx/commit/f3c9eb77fa547a48862bc9bcec5f0d6acf4f0bb8)). This repo **compiles that exact commit from source** with the CUDA MatMul backend by choice - it guarantees native codegen for the supported NVIDIA arch set (`sm_80/86/89/90/120`) and a byte-reproducible build. To run the GPG-signed prebuilt instead, set `BTX_INSTALL_MODE=release` + `RELEASE_TAG=v0.32.12` in `docker-compose.yml`.
 >
 > **Consensus timeline (upgrade before each height or you fork off the network):** block **125,000** shielded sunset + MatMul nonce-seed **v2**; **130,000** temporary empty-block subsidy penalty; **130,500** MatMul seed-derivation **v3** (binds each nonce's seed to the parent block's `parent_mtp`); **132,000** forward consensus (shielded-exit velocity cap, empty-block penalty ends); **135,000** shielded-unshield velocity-cap quota ends (added in v0.32.12). 0.32.12 covers all of these.
 
@@ -37,8 +55,8 @@ against, or to solo-mine end to end.
 - **Source build:** compiles a single, pinned, immutable commit (0.32.12) from
   [`github.com/btxchain/btx`](https://github.com/btxchain/btx). The signed
   release key is integrity-only (self-published, no independent vouching), so
-  commit pinning is comparable trust - and a native `sm_120` compile is better
-  for the 5090. Acceptable **only** because everything runs sandboxed here with
+  commit pinning is comparable trust - and native CUDA cubins for `sm_80/86/89/90/120`
+  avoid depending on generic PTX JIT for supported NVIDIA generations. Acceptable **only** because everything runs sandboxed here with
   no funds at stake; do not extend trust beyond this container. Set
   `BTX_INSTALL_MODE=release` to run the signed prebuilt instead.
 - Mines to a wallet generated **inside your mounted `./btx-data`** so the wallet
@@ -73,11 +91,13 @@ layer cache, so nothing recompiles unless you change `BTX_SOURCE_REF`.
 
 ## Install the prebuilt miner (`matador-miner`)
 
-Prefer a single binary over the Docker stack? `matador-miner` is a **standalone solo GPU
-miner**: it pulls work from **your own `btxd`** via `getblocktemplate`, solves on the GPU
-(our +22.9% overlap is baked in), and submits with `submitblock`. It is **decoupled from
-the node**, so updating the miner never restarts `btxd` (no shielded-state warmup, no lost
-propagation standing). Linux x86-64, NVIDIA Blackwell `sm_120` (RTX 5090).
+Prefer a single binary over the Docker stack? `matador-miner` is a **standalone solo + pool
+GPU miner**: solo pulls work from **your own `btxd`** via `getblocktemplate`, solves on the
+GPU, and submits with `submitblock`; pool mode talks directly to
+[minebtx](https://minebtx.com/) / dexbtx-style stratum pools. It is **decoupled from the node**, so updating the miner never restarts
+`btxd` (no shielded-state warmup, no lost propagation standing). Linux x86-64 release
+assets are CUDA fat binaries for `sm_80`, `sm_86`, `sm_89`, `sm_90`, and `sm_120`
+(Ampere through Blackwell); macOS arm64 assets use Metal.
 
 **One-line install** (downloads the newest published release, including prereleases,
 verifies the sha256, installs to `/usr/local/bin`):
@@ -99,7 +119,7 @@ chmod +x "$(basename "$url")" && sudo mv "$(basename "$url")" /usr/local/bin/mat
 matador-miner --help
 ```
 
-**Run it** against a synced `btxd` (this repo's `make node`, or any `btxd` v0.32.12+ with
+**Solo-mine** against a synced `btxd` (this repo's `make node`, or any `btxd` v0.32.12+ with
 RPC enabled):
 
 ```bash
@@ -111,13 +131,82 @@ matador-miner \
 #         --dev-fee 1 (default; 0 disables)  --dev-address <addr>  LOG_LEVEL=debug
 ```
 
+**Pool-mine** without running a node locally:
+
+```bash
+matador-miner \
+  --mode pool \
+  --pool stratum+tcp://stratum.minebtx.com:3333 \
+  --worker rig1 \
+  --payoutaddress btx1...your-P2MR-address
+```
+
+Useful minebtx links:
+
+- Pool homepage / installer: [`minebtx.com`](https://minebtx.com/)
+- Live pool dashboard: [`pool.minebtx.com`](https://pool.minebtx.com/)
+- Reference pool/client source: [`github.com/dexbtx/minebtx`](https://github.com/dexbtx/minebtx)
+
+For unattended rigs, use a JSON config with ordered failover pools plus the local read-only
+API/watchdog:
+
+```bash
+matador-miner --config /etc/matador-miner/config.json --api --api-port 4060
+curl -s http://127.0.0.1:4060/health
+curl -s http://127.0.0.1:4060/summary   # shares, nonces, pools, watchdog, GPU temp/power/util
+curl -s http://127.0.0.1:4060/pools
+scripts/matador-status.sh                # readable dashboard for the same API
+```
+
+See [`docs/matador-config.example.json`](docs/matador-config.example.json) and
+[`docs/matador-standalone-ops.md`](docs/matador-standalone-ops.md).
+
 - **Solo + your keys only.** It submits to *your* `btxd` over **localhost RPC** and holds
   **no wallet keys**; mined coins pay the `--payoutaddress` you provide.
 - **1% dev fee, time-based + transparent.** Like Claymore/PhoenixMiner/T-Rex, it points the
   coinbase at the dev address for ~1% of wall-clock time (~36s/hr) and **logs every
   entry/exit** of that window. Turn it off with `--dev-fee 0`.
+- **Pool failover + self-watchdog.** Pool mode supports ordered `pools[]`, reconnect/failover
+  on connection loss, a safe reject-streak watchdog, and loopback-only status endpoints.
+- **Warning-only thermal watchdog.** `/summary` and logs report GPU temp/power warnings, but
+  the miner does not change clocks, fans, power limits, or restart itself.
+- **AMD/ROCm sidecar bridge.** `--backend hip` / `--backend rocm` delegates pool and solo
+  solves to the external C++/HIP `btx-gbt-solve-hip` sidecar (`MATADOR_HIP_SOLVER`).
+  If the sidecar is missing/fails, matador logs the reason and falls back to its in-process path.
+  AMD telemetry can use `rocm-smi` when present.
 - Closed-source binary (AM2 LLC); **verify the sha256** before running. `LOG_LEVEL=debug`
   for full per-stage solve timing, every template, every submit (accept/reject + reason).
+
+## Tuning
+
+**`matador-miner` self-tunes the solver internals** (input generation, batch size, prefetch
+depth, pipeline overlap) for the detected GPU, so there is very little to turn. The only knobs
+you normally touch:
+
+| Knob | Default | What it does | When to change |
+| --- | --- | --- | --- |
+| `solver_threads` | 1 | CPU feeder threads per GPU | Raise (e.g. 8) if the GPU isn't saturated; too many starves a fast card |
+| `overlap` | true | pipeline-overlap (+22.9%, byte-exact) | Leave on; set false only for a serial A/B baseline |
+| `backend` | cuda | `cuda` / `metal` / `cpu` / `hip`/`rocm` | Match your hardware |
+| `--dev-fee` | 1 | dev-fee % of wall-clock time | `0` disables |
+
+If instead you run the **upstream [`dexbtx-miner`](https://github.com/dexbtx/minebtx) pool
+client** (its `~/.dexbtx-miner/config.yaml`), these are the levers that actually matter, per its
+`docs/TUNING.md`:
+
+| Knob | Recommended | Notes |
+| --- | --- | --- |
+| `gpu_inputs` | **your GPU count** | It's a *count*, not a flag: `0` = CPU-gen (dead since block 125,000, gives 0-20% util), `1` = single GPU (mandatory for one card), `N` = N GPUs in the rig |
+| `solver_batch_size` | **128** | Sweet spot. 256+ degrades util; 1024 crashes the CUDA buffer pool. Bigger is a trap |
+| `solver_threads` | 8 (12-16 for slow cards / 5090) | Too many starves a fast card, too few starves a slow one |
+| `solver_prepare_workers` | 16 (~2x threads; 24 for slow cards) | Feeds the solver; under-provisioning bottlenecks prep |
+| `solver_prefetch_depth` | 8 | Universal sweet spot |
+| `nonces_per_slice` | leave huge (default ~1e11) | The real cap is the 30s/slice timeout; a low value just churns slices |
+
+**Golden rule for either:** change **one** knob at a time and confirm on the live miner, not a
+synthetic bench. Watch util/power with `nvidia-smi --query-gpu=utilization.gpu,power.draw,temperature.gpu --format=csv -l 2`
+alongside the accepted-share rate; aim for ~90%+ util. Reference points: a 3090/A6000 is GA102
+(`sm_86`), a 4090 is `sm_89`, a 5090 is `sm_120`.
 
 ## Why solo
 
