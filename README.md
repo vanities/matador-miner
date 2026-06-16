@@ -33,6 +33,32 @@ Built to be fast (CUDA async overlap is baked in) and to keep solo blocks self-c
 > The sidecar build emits a fat HIP binary for common AMD code-object targets by default; set
 > `HIP_ARCHS="gfx1030 gfx1100"` to narrow the build for a known rig.
 
+## Quick start (just want to mine?)
+
+**[⬇️ Download the latest release](https://github.com/vanities/matador-miner/releases/latest)** -
+Linux x86-64 (NVIDIA CUDA, with the AMD/HIP sidecar in the bundle) and macOS arm64 (Apple Metal).
+
+**1. Install** - Linux, one line (fetches the latest, verifies the sha256, installs to `/usr/local/bin`):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/vanities/matador-miner/main/install.sh | bash
+```
+
+**2. Pool-mine** - no node to run, just point it at the pool with your payout address:
+
+```bash
+matador-miner --mode pool \
+  --pool stratum+tcp://stratum.minebtx.com:3333 \
+  --worker rig1 \
+  --payoutaddress btx1...your-btx-address
+```
+
+You should see `accepted` shares and a `nonce/s` / `scan=…MN/s` heartbeat within seconds. That's it.
+
+Want the bundle (miner + config templates + AMD sidecar), solo mining against your own `btxd`,
+Apple/AMD specifics, or the self-contained Docker node? See
+[Install the prebuilt miner](#install-the-prebuilt-miner-matador-miner) and the sections below.
+
 This repo also ships a sandboxed **Docker node + solo-miner** setup (`make solo`) that runs
 a pinned BTX full node and mines with the CUDA backend, keeping the node, miner, and wallet
 data isolated from the host - a turnkey way to run a node for the standalone miner to mine
@@ -82,12 +108,13 @@ make solo        # build (first run) + solo-mine on 0.32.12
 make help        # all targets: up/down/logs/status/balance/backup/restore/deploy/...
 ```
 
-First build **compiles btxd + the CUDA backend from source** (a one-time
-~20-40 min step; the NVIDIA CUDA toolchain it needs is pulled into the Docker
-build, not your host). After that it syncs the chain (fast-start / assumeutxo
-keeps this short - see [Fast-start](#fast-start--snapshot-0321), prints **your**
-mining address, and starts a supervised solo-mining loop. Rebuilds reuse Docker's
-layer cache, so nothing recompiles unless you change `BTX_SOURCE_REF`.
+The first (cold) build **compiles btxd + the CUDA backend from source** - a one-time
+~20-40 min step, with the NVIDIA CUDA toolchain pulled into the Docker build, not your
+host. After that it syncs the chain (fast-start / assumeutxo keeps this short - see
+[Fast-start](#fast-start--snapshot-03212)), prints **your** mining address, and starts a
+supervised solo-mining loop. Rebuilds reuse Docker's layer cache **plus ccache**, so a
+`BTX_SOURCE_REF` bump recompiles only the translation units that actually changed
+(minutes, not a full rebuild).
 
 ## Install the prebuilt miner (`matador-miner`)
 
