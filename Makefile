@@ -34,14 +34,9 @@ logs: ## Follow the miner logs
 stats: ## One-shot dashboard: balance + chain + mining + GPU
 	@bash scripts/stats.sh
 
-status: ## Sync + mining status (height, difficulty trend, live solve rate)
+status: ## Sync + chain status (height, sync progress, difficulty, peer/guard health)
 	@$(CLI) getblockchaininfo | grep -E '"(blocks|headers|verificationprogress|initialblockdownload)"'
 	@$(CLI) getmininginfo   | grep -E 'difficulty|networkhashps|should_pause_mining|"reason"|near_tip'
-	@printf 'live rate : '; \
-	 N1=$$($(CLI) getmatmulchallengeprofile 2>/dev/null | jq -r '.service_profile.runtime_observability.solve_pipeline.batched_nonce_attempts // 0'); \
-	 sleep 3; \
-	 N2=$$($(CLI) getmatmulchallengeprofile 2>/dev/null | jq -r '.service_profile.runtime_observability.solve_pipeline.batched_nonce_attempts // 0'); \
-	 if [ "$$N2" -gt "$$N1" ] 2>/dev/null; then echo "$$(( (N2-N1)/3 )) nonce-attempts/s (live, vs bench which runs several x faster)"; else echo "(warming up)"; fi
 
 balance: ## Wallet balance / immature / tx count
 	@$(WCLI) getwalletinfo | grep -E '"balance"|immature|txcount'
