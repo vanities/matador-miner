@@ -1,17 +1,19 @@
 # Isolated BTX GPU solo-miner — COMPILES btxchain/btx from source.
 #
-# Pinned to the v0.32.11 tag commit, compiled WITH the CUDA MatMul backend PLUS
+# Pinned to the v0.32.12 tag commit, compiled WITH the CUDA MatMul backend PLUS
 # our v3 pipeline-overlap patch (+22.9% live; patches-overlap/, src/pow.cpp only).
 # Upstream ships GPG-signed cuda13 prebuilts for tagged releases, but we compile
 # by choice: it guarantees native sm_120 codegen for the RTX 5090 (the prebuilt's
 # embedded archs are unverified) and yields a byte-reproducible build from an
 # immutable SHA. To run the signed prebuilt instead, set BTX_INSTALL_MODE=release
-# + RELEASE_TAG=v0.32.11 in docker-compose.yml (the entrypoint keeps that path).
+# + RELEASE_TAG=v0.32.12 in docker-compose.yml (the entrypoint keeps that path).
 #
-# 0.32.11 is a btx-node sync point release that HARDENS MatMul v3 parent-MTP seed
-# handling across CPU/Metal/CUDA (fixes the v3 GPU-scan stall hit on 0.32.10) and
-# ADDS forward consensus at height 132,000 (velocity cap, empty-block penalty end,
-# recovery-exit) — upgrade before 132,000. (0.32.10 added the MatMul SEED-DERIVATION
+# 0.32.12 is a CONSENSUS-only follow-up to 0.32.11 (NO src/cuda or src/metal changes):
+# it MOVES the shielded-unshield velocity-cap EXIT from height 132,000 to 135,000 and
+# ships v9 assumeutxo snapshots at heights 132,142-132,209 (the live chain is already
+# PAST 132,000), so upgrade before 135,000. It inherits 0.32.11's HARDENED MatMul v3
+# parent-MTP seed handling across CPU/Metal/CUDA (the v3 GPU-scan stall fix hit on
+# 0.32.10). (0.32.10 added the MatMul SEED-DERIVATION
 # v3 CONSENSUS upgrade at HEIGHT 130,500 — the v2 seed binds more chain data; all
 # nodes/miners/pools/services had to upgrade before 130,500.) The v3 change lives in
 # pow.cpp + chainparams/validation; src/cuda/ is otherwise UNTOUCHED, so the stock
@@ -40,9 +42,9 @@ ARG CUDA_RUNTIME_IMAGE=nvidia/cuda:13.0.0-runtime-ubuntu24.04
 FROM ${CUDA_DEVEL_IMAGE} AS builder
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Exact upstream commit to compile. 215170f2 = the v0.32.11 release tag commit. An
+# Exact upstream commit to compile. f3c9eb77 = the v0.32.12 release tag commit. An
 # immutable SHA means every rebuild on every box produces a byte-identical tree.
-ARG BTX_SOURCE_REF=215170f27f7d6889ce34aa7dbba2858ea07a468c
+ARG BTX_SOURCE_REF=f3c9eb77fa547a48862bc9bcec5f0d6acf4f0bb8
 # sm_120 = NVIDIA Blackwell (RTX 5090). Other GPUs: Ada=89, Hopper=90, Ampere=80/86.
 ARG BTX_CUDA_ARCHITECTURES=120
 
@@ -128,7 +130,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       libboost-system1.83.0 libboost-filesystem1.83.0 libboost-program-options1.83.0 \
  && rm -rf /var/lib/apt/lists/*
 
-# Compiled 0.32.11 binaries (btxd, btx-cli, btx-matmul-*) + the contrib/ scripts
+# Compiled 0.32.12 binaries (btxd, btx-cli, btx-matmul-*) + the contrib/ scripts
 # the entrypoint drives at run time (mining loop; faststart for release mode).
 COPY --from=builder /opt/btx-src/build/bin/ /opt/btx/bin/
 COPY --from=builder /opt/btx-src/contrib/   /opt/btx-src/contrib/
