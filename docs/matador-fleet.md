@@ -29,6 +29,57 @@ state.
    all pay ONE fleet wallet; a per-rig coinbase extranonce keeps their work disjoint
 ```
 
+## Quickstart: a bunch of rigs + a laptop dashboard
+
+The easiest reliable topology is a **mesh VPN** (e.g. [Tailscale](https://tailscale.com/)
+or WireGuard) joining your laptop + all rigs to one private network. Then nothing is
+public, every rig is reachable by its VPN IP, and you view the dashboard from your laptop
+with no SSH tunnels. (No VPN? See "viewing without a VPN" at the end.)
+
+**0. One VPN, once.** Install the VPN on the laptop, the coordinator, and every rig so they
+share a private subnet (say `100.x.y.z`). Everything below binds to that, never to public.
+
+**1. Coordinator** (one box with a synced `btxd` - this repo's `make solo`, or any
+`btxd` v0.32.12+). Pick a fleet token once, then bring up the proxy + dashboard:
+
+```bash
+export FLEET_TOKEN="$(head -c 24 /dev/urandom | base64)"; echo "token: $FLEET_TOKEN"
+# one command starts the GBT proxy (:4071) + telemetry hub (:4070):
+FLEET_TOKEN="$FLEET_TOKEN" NODE_COOKIE=~/.btx/.cookie \
+  HUB_WORKERS="rig1=http://100.0.0.11:4060,rig2=http://100.0.0.12:4060" \
+  scripts/matador-coordinator.sh --listen 100.0.0.1
+```
+
+**2. Each rig** (no node needed). Install once, then point it at the coordinator. The API
+is on by default; just bind it to the VPN so the hub can read it:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/vanities/matador-miner/main/install.sh | bash
+matador-miner --mode solo \
+  --rpcconnect 100.0.0.1 --rpcport 4071 --rpcuser rig1 --rpcpassword "$FLEET_TOKEN" \
+  --payoutaddress btx1...FLEET_WALLET --worker rig1 \
+  --api-listen 100.0.0.11 \                                  # bind the API to the VPN IP
+  --fallback-pool stratum+tcp://stratum.minebtx.com:3333     # optional: pool if coordinator drops
+```
+
+Give each rig a **unique `--worker`** (drives its coinbase extranonce) and the **same
+`--payoutaddress`** (one fleet wallet). Run it under systemd / `nohup` / `tmux` so it
+survives logout (see `matador-standalone-ops.md`).
+
+**3. Laptop** - just open the dashboard (the VPN makes the coordinator reachable):
+
+```
+http://100.0.0.1:4070
+```
+
+That's it: total hashrate, and per-rig version / power / temp / mining|gated|offline,
+auto-refreshing. Adding a rig = install it + add one entry to `HUB_WORKERS`.
+
+**Viewing without a VPN (SSH only, e.g. one remote box):** run the coordinator as above
+bound to `127.0.0.1`, then from the laptop `ssh -L 4070:127.0.0.1:4070 <coordinator>` and
+open `http://localhost:4070`. (This is fine for a few SSH-reachable boxes; a VPN scales
+better for "a bunch of rigs.")
+
 ## Why single wallet + extranonce (what real operators do)
 
 Large solo farms and pools both mine to a **single on-chain address** - it's all one

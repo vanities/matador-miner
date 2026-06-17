@@ -257,6 +257,25 @@ See [`docs/config.example.nvidia.json`](docs/config.example.nvidia.json),
 [`docs/config.example.mac.json`](docs/config.example.mac.json), and
 [`docs/matador-standalone-ops.md`](docs/matador-standalone-ops.md).
 
+### Run a fleet (many rigs, one dashboard)
+
+Got several rigs and want to watch them all from your laptop? Run **one coordinator**
+(your `btxd` + a `getblocktemplate` proxy + a telemetry hub), point disposable workers at
+it to solo-mine through it (one shared wallet, per-rig coinbase extranonce so no duplicate
+work), and view a live dashboard. The miner's status API is on by default, so each rig is
+hub-ready out of the box. One-command coordinator:
+
+```bash
+FLEET_TOKEN=... NODE_COOKIE=~/.btx/.cookie \
+  HUB_WORKERS="rig1=http://10.0.0.11:4060,rig2=http://10.0.0.12:4060" \
+  scripts/matador-coordinator.sh --listen 10.0.0.1
+# dashboard: http://10.0.0.1:4070    (workers: matador-miner --mode solo --rpcport 4071 ...)
+```
+
+Full copy-paste setup (VPN-based, plus the SSH-tunnel option for viewing from a laptop),
+auto pool-fallback, and the idle-gate are in
+**[`docs/matador-fleet.md`](docs/matador-fleet.md#quickstart-a-bunch-of-rigs--a-laptop-dashboard)**.
+
 - **Solo + your keys only.** It submits to *your* `btxd` over **localhost RPC** and holds
   **no wallet keys**; mined coins pay the `--payoutaddress` you provide.
 - **1% dev fee, time-based + transparent.** Like Claymore/PhoenixMiner/T-Rex, it points the
