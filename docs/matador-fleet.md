@@ -124,6 +124,40 @@ coordinator every `--solo-recheck-s` and re-exec's back to solo once it answers.
 keys: `fallback_pool`, `fallback_after_s`, `solo_recheck_s` (env `MATADOR_FALLBACK_POOL`
 etc). Leave `fallback_pool` empty to disable (solo just retries forever, the old behavior).
 
+## Idle-gate: mine when the box is idle, yield when it's needed
+
+This is the literal "hop on / hop off" - let a workstation or a datacenter node mine in
+its spare cycles and **instantly give the GPU back** when real work shows up. matador polls
+an operator-supplied command and pauses when it says to:
+
+```bash
+matador-miner --mode solo --rpcconnect coordinator.lan --rpcport 4071 \
+  --rpcuser rig7 --rpcpassword "$FLEET_TOKEN" --payoutaddress btx1...FLEET_WALLET --worker rig7 \
+  --should-mine-command "/opt/matador/scripts/gpu-idle.sh 5" \  # exit 0=mine, non-zero=yield
+  --should-mine-interval 2 \                                    # poll cadence (s)
+  --gate-yield abort                                            # kill in-flight solve to free GPU fast
+```
+
+- **Polarity** (matches the node's `test ! -f .pause-mining` convention): the command
+  exits **0 = mine**, **non-zero = yield**. Empty = always mine.
+- On yield with `--gate-yield abort` (default), matador aborts the in-flight solve so the
+  GPU frees within ~the poll interval; `finish` lets the current solve complete first.
+- No warmup on resume - the coordinator holds the chain.
+- The gated state is visible: `/summary` reports `mining_state` (`mining`|`gated`) and
+  `gate_reason` (the command's stdout), and the hub shows a **gated** category.
+
+**Reference gate `scripts/gpu-idle.sh <idle_min> [gpu] [self_match]`:** mine only when no
+*other* GPU compute process is running (it excludes matador itself), after the GPU has been
+free for `idle_min` minutes. It keys off **foreign GPU processes, not raw utilization** -
+because while matador mines the GPU is at ~99%, a util-threshold gate would fight its own
+load and flap. For desktop/gaming yield (a game may use a graphics context, not a compute
+one), gate on a session/activity check instead - the command can be anything.
+
+The poll is cheap and **off the GPU**: it spawns a single-field `nvidia-smi` query every
+couple seconds on a background thread (the same class of call matador's thermal watchdog
+already makes), so it does not touch mining throughput - the only cost is the intended one
+(yielding when the box is busy).
+
 ## Security notes
 
 - **Bind the proxy and hub to LAN/VPN only** and firewall them. The fleet token is the only

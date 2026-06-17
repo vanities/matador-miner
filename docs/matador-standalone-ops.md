@@ -44,6 +44,8 @@ Supported JSON keys mirror the existing CLI/env surface:
 - `devfee` / `dev_fee`, `devaddress` / `dev_address`
 - `solver_threads`, `overlap`
 - `update_check`, `auto_update`, `update_channel` (`stable`|`prerelease`), `update_interval_s`, `update_jitter_s`, `min_version_age_s` (see [Auto-update](#auto-update))
+- `should_mine_command`, `should_mine_interval`, `gate_yield` (`abort`|`finish`) - idle-gate; see [matador-fleet.md](matador-fleet.md#idle-gate-mine-when-the-box-is-idle-yield-when-its-needed)
+- `fallback_pool`, `fallback_after_s`, `solo_recheck_s` - solo->pool failover; see [matador-fleet.md](matador-fleet.md)
 
 Do not commit a real config if it contains RPC credentials. The miner logs the config file path, byte size, and number of applied settings, but not RPC passwords or pool passwords.
 
