@@ -104,6 +104,26 @@ coordinator holds the chain. When a worker solves, it submits through the proxy 
 coordinator's well-peered node broadcasts, so the disposable workers don't need good
 peering (this also reduces orphans vs every rig broadcasting independently).
 
+## Resilience: automatic pool fallback
+
+The coordinator is a single point of failure for the fleet's solo mining, so a worker can
+fall back to a pool when it goes down and return to solo when it recovers - no idle rigs:
+
+```bash
+matador-miner --mode solo \
+  --rpcconnect coordinator.lan --rpcport 4071 --rpcuser rig7 --rpcpassword "$FLEET_TOKEN" \
+  --payoutaddress btx1...FLEET_WALLET --worker rig7 \
+  --fallback-pool stratum+tcp://stratum.minebtx.com:3333 \  # where to mine if the coordinator dies
+  --fallback-after-s 60 \                                   # solo down this long -> fail over
+  --solo-recheck-s 120                                      # while on pool, probe coordinator this often
+```
+
+If the coordinator's GBT source is unreachable for `--fallback-after-s`, the worker
+re-exec's (same PID) into pool mode on `--fallback-pool`; a recovery prober then checks the
+coordinator every `--solo-recheck-s` and re-exec's back to solo once it answers. Config
+keys: `fallback_pool`, `fallback_after_s`, `solo_recheck_s` (env `MATADOR_FALLBACK_POOL`
+etc). Leave `fallback_pool` empty to disable (solo just retries forever, the old behavior).
+
 ## Security notes
 
 - **Bind the proxy and hub to LAN/VPN only** and firewall them. The fleet token is the only
@@ -111,8 +131,8 @@ peering (this also reduces orphans vs every rig broadcasting independently).
 - The proxy is **least-privilege by construction** - the method whitelist is hard-coded to
   `getblocktemplate` + `submitblock`. Even a fully compromised worker cannot drain a wallet
   or stop the node through it.
-- The proxy is a single point of failure for the fleet's solo mining; pool fallback on the
-  worker (so a coordinator outage doesn't idle rigs) is the next planned piece.
+- The proxy is a single point of failure for the fleet's solo mining; workers handle this
+  with automatic pool fallback (see above) so a coordinator outage doesn't idle rigs.
 
 ## See also
 
