@@ -21,6 +21,7 @@ Designed to keep solo blocks self-custodied.
 | Hardware | Backend | Estimated rate | Notes |
 |----------|---------|----------------|-------|
 | NVIDIA RTX 5090 / Blackwell `sm_120` | CUDA | ~19.5k-20.5k nonce/s | Observed release-build pool rate. |
+| NVIDIA H100 (Hopper `sm_90`, SXM) | CUDA | ~12.5k nonce/s | Community-reported. This PoW is integer/ALU work with no tensor cores, so the H100 runs at its FP32/INT32 tier (~4090-class, ~63% of a 5090), not its AI tier. Works, but a 5090 is better per watt/dollar here. |
 | Apple M4 Max | Metal | ~1.1k-1.3k nonce/s | Working macOS arm64 build; useful for dev / spare-Mac mining. |
 | Other NVIDIA CUDA GPUs | CUDA | not benchmarked here | Release binaries include Ampere/Ada/Hopper/Blackwell cubins: `sm_80`, `sm_86`, `sm_89`, `sm_90`, `sm_120`. Measure locally. |
 | Multiple NVIDIA GPUs | CUDA | working | Configure the GPU list in `matador.json` or with `--gpus`. |
