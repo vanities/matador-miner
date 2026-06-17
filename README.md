@@ -169,6 +169,12 @@ $EDITOR matador.json                          # set your payout address + worker
 ./bin/matador-miner                           # auto-loads ./matador.json and starts mining
 ```
 
+For multi-GPU rigs, set `"gpus": [0, 1, 2]` in `matador.json` (or pass
+`--gpus 0,1,2`). This is deliberately simple: matador starts one ordinary miner
+process per GPU, scopes visible devices for each child, appends worker suffixes
+like `rig1-gpu0`, and increments API ports (`4060`, `4061`, ...). No cross-GPU
+batching or autotuning is attempted.
+
 Prefer just the bare binary? Use the one-liner below instead.
 
 **One-line install** (downloads the newest published release, including prereleases,

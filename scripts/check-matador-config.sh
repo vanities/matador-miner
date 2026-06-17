@@ -40,6 +40,7 @@ for path, backend in expected_backends.items():
     assert not missing, f"{p} missing keys: {missing}"
     assert data['mode'] in {'solo', 'pool'}, p
     assert data['backend'] == backend, f"{p} backend={data['backend']} expected {backend}"
+    assert data['gpus'] == [0], f"{p}: expected editable single-GPU default"
     assert data['payoutaddress'] == example_payout, f"{p}: expected shared example payout address"
     assert isinstance(data['pools'], list) and data['pools'], f'{p}: pools must be a non-empty list'
     assert data['pools'][0].get('label') == 'shibs-minebtx', f'{p}: first pool should be shibs-minebtx'
@@ -133,10 +134,12 @@ expect('amd telemetry fallback present', 'rocm-smi --showuniqueid --showuse --sh
 expect('external hip sidecar path present', 'MATADOR_HIP_SOLVER' in s and 'SolveWithExternalHip' in s and 'btx-gbt-solve-hip' in s)
 expect('hip sidecar auto-discovery present', 'ResolveHipSolverPath' in s and 'auto-discovered sidecar=' in s and '--hip-solver=<path>' in s)
 expect('hip sidecar config aliases present', '"hip_solver", "hip-solver", "hip_solver_path", "hip-solver-path"' in s and 'root.exists("sidecars") && root["sidecars"].isObject()' in s)
+expect('multi-gpu config/cli present', 'std::vector<std::string> gpu_devices' in s and 'static bool ConfigGpuDevices' in s and '--gpus=<ids>' in s and 'MATADOR_GPUS' in s)
+expect('multi-gpu process fan-out present', 'static bool MaybeRunMultiGpuSupervisor' in s and 'CUDA_VISIBLE_DEVICES' in s and 'HIP_VISIBLE_DEVICES' in s and 'MATADOR_MULTI_GPU_CHILD_WORKER' in s)
 expect('pool watchdog implemented safe reconnect', 'static std::thread StartPoolWatchdog' in s and 'watchdog_reconnect_requested.store(true)' in s and 'actions=reconnect/failover' in s)
 expect('thermal watchdog is observe-only', '[thermal] threshold crossed observe_only=true' in s and 'thermal_warn_temp_c' in s)
 expect('minebtx shorthand supported', 'if (s == "minebtx") s = "stratum.minebtx.com:3333"' in s)
-for key in ['"pool_pass", "pool-pass"', '"payoutaddress", "payout_address"', '"devfee", "dev_fee", "dev-fee"', '"solver_threads", "solver-threads"']:
+for key in ['"pool_pass", "pool-pass"', '"payoutaddress", "payout_address"', '"devfee", "dev_fee", "dev-fee"', '"solver_threads", "solver-threads"', '"gpus", "gpu_devices", "gpu-devices", "devices"']:
     expect(f'config alias {key}', key in s)
 for key in ['"api_enabled", "api-enabled"', '"api_listen", "api-listen"', '"api_port", "api-port"']:
     expect(f'config alias {key}', key in s)

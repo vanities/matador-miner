@@ -31,6 +31,7 @@ Supported JSON keys mirror the existing CLI/env surface:
 - `pools`: ordered failover array. Entries may be strings (`"minebtx.com:3333"`) or objects with either `url` or `host`+`port` plus optional `label`/`name`. The first entry is primary; later entries are tried when connect/disconnect/stall recovery trips.
 - `worker`, `pool_pass`
 - `chain`, `backend` (`cuda`, `metal`, `cpu`, or `hip`/`rocm`). HIP/ROCm delegates solves to the external C++/HIP `btx-gbt-solve-hip` sidecar. Release bundles auto-discover it next to `bin/matador-miner`; outside a bundle use `--hip-solver <path>` or config `sidecars.hip`.
+- `gpus`: optional basic multi-GPU fan-out list, e.g. `[0, 1, 2]`. This starts one normal miner process per device with `CUDA_VISIBLE_DEVICES` / `HIP_VISIBLE_DEVICES` / `ROCR_VISIBLE_DEVICES` scoped to that child, worker suffixes like `rig1-gpu0`, and API ports incremented from the configured base (`4060`, `4061`, ...). This is not a solver optimization; it is just safe process-level fan-out.
 - `api`: optional local read-only status API object: `{ "enabled": true, "listen": "127.0.0.1", "port": 4060 }`
 - `api_enabled` / `api_listen` / `api_port`: flat aliases for the same status API settings
 - `watchdog`: pool-mode self-supervision object: `{ "enabled": true, "check_s": 15, "reject_streak": 20, "no_share_s": 0 }`

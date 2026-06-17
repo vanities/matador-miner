@@ -11,6 +11,9 @@
   "payoutaddress": "btx1zcf4z36asua8ylchysphgwfgyfr8267vvznth826epden7lar4fnqvy9gzv",
   "chain": "main",
   "backend": "hip",
+  "gpus": [
+    0
+  ],
   "sidecars": {
     "hip": "./bin/btx-gbt-solve-hip"
   },
