@@ -43,7 +43,7 @@ Supported JSON keys mirror the existing CLI/env surface:
 - `maxtries` / `max_tries`
 - `devfee` / `dev_fee`, `devaddress` / `dev_address`
 - `solver_threads`, `overlap`
-- `update_check`, `auto_update`
+- `update_check`, `auto_update`, `update_channel` (`stable`|`prerelease`), `update_interval_s`, `update_jitter_s`, `min_version_age_s` (see [Auto-update](#auto-update))
 
 Do not commit a real config if it contains RPC credentials. The miner logs the config file path, byte size, and number of applied settings, but not RPC passwords or pool passwords.
 
@@ -90,9 +90,39 @@ POOL=stratum+tcp://stratum.minebtx.com:3333 matador-miner --mode pool \
   --payoutaddress btx1zcf4z36asua8ylchysphgwfgyfr8267vvznth826epden7lar4fnqvy9gzv --worker rig1
 ```
 
+## Auto-update
+
+`matador-miner` keeps itself current. By default it checks GitHub releases at startup
+**and** on an interval, and when a newer release is out it downloads the platform
+binary, sha256-verifies it, atomically swaps this executable, and re-exec's into it.
+The re-exec keeps the same PID and does **not** restart `btxd` - in pool mode there is
+no local node, and in solo mode the separate `btxd` process is untouched.
+
+Config keys (CLI / env / `matador.json`, same precedence as everything else):
+
+| key | default | meaning |
+|-----|---------|---------|
+| `auto_update` | `true` | download+verify+swap+re-exec. `false` / `--no-auto-update` = check + notify only |
+| `update_check` | `true` | `false` / `--no-update-check` disables the check entirely (startup + periodic) |
+| `update_channel` | `stable` | `stable` = GitHub "Latest" (non-prerelease). `prerelease` = newest tag incl. prereleases |
+| `update_interval_s` | `1800` (30min) | periodic re-check cadence. `<=0` = startup-only |
+| `update_jitter_s` | `300` | random `0..N`s delay before each periodic check, to de-sync a fleet |
+| `min_version_age_s` | `3600` (1h) | bake-time: only auto-adopt a release once it is this old. Stops a whole fleet jumping onto a brand-new bad release the instant it is published |
+
+The status API exposes update state for dashboards/fleet views:
+
+```bash
+curl -s http://127.0.0.1:4060/summary | python3 -c 'import sys,json;print(json.load(sys.stdin)["update"])'
+# {"current":"v0.4.1","latest_seen":"v0.4.1","last_check_age_sec":42,"channel":"stable","auto_update":true}
+```
+
+**Pinning a release** (datacenter operators who stage updates): set `auto_update: false`
+(checks + logs only), or `update_check: false` (silent), and roll binaries yourself.
+
 ## systemd service template
 
-For a standalone pool rig:
+For a standalone pool rig. Note the install path and `ReadWritePaths` - they are what
+make in-place auto-update work under a hardened unit:
 
 ```ini
 # /etc/systemd/system/matador-miner.service
@@ -107,11 +137,20 @@ User=miner
 Group=miner
 Environment=LOG_LEVEL=info
 Environment=MATADOR_CONFIG=/etc/matador-miner/config.json
-ExecStart=/usr/local/bin/matador-miner
+# Install the binary somewhere the SERVICE USER owns, not /usr/local/bin (root-owned).
+# Auto-update does rename(self+".new", self), which needs write+execute on this dir.
+ExecStart=/opt/matador/bin/matador-miner
 Restart=always
 RestartSec=10
 TimeoutStopSec=30
 NoNewPrivileges=true
+
+# Hardening that stays COMPATIBLE with self-update:
+ProtectSystem=strict
+ReadWritePaths=/opt/matador/bin     # REQUIRED: without this, ProtectSystem=strict
+                                    # silently blocks the binary swap and auto-update
+                                    # no-ops (logs "cannot replace binary ...").
+ProtectHome=true
 
 [Install]
 WantedBy=multi-user.target
@@ -121,10 +160,48 @@ Install/start:
 
 ```bash
 sudo useradd --system --create-home --shell /usr/sbin/nologin miner || true
+sudo install -d -o miner -g miner /opt/matador/bin
+sudo install -o miner -g miner matador-miner /opt/matador/bin/matador-miner
 sudo systemctl daemon-reload
 sudo systemctl enable --now matador-miner.service
 journalctl -u matador-miner -f
 ```
+
+Why in-process re-exec is safe under systemd: `execv` replaces the process image but
+keeps the **same PID**, so for `Type=simple` the update is invisible to systemd - no
+restart, no `Restart=` bump, argv preserved. The only requirements are (1) the binary
+lives in a service-user-owned dir and (2) `ReadWritePaths=` covers it. Verify after a
+release with `curl -s http://127.0.0.1:4060/summary | grep -o '"current":"[^"]*"'`.
+
+### Alternative: let systemd own the update cadence (timer)
+
+If you prefer updates in a maintenance window instead of in-process, disable the
+in-process periodic check (`update_interval_s: 0`) and drive `--update-check-only` from
+a timer. `--update-check-only` runs one check (which may swap+re-exec) then exits; it
+needs no payout/RPC/GPU.
+
+```ini
+# /etc/systemd/system/matador-update.service
+[Service]
+Type=oneshot
+User=miner
+ExecStart=/opt/matador/bin/matador-miner --update-check-only
+ProtectSystem=strict
+ReadWritePaths=/opt/matador/bin
+
+# /etc/systemd/system/matador-update.timer
+[Timer]
+OnCalendar=*-*-* 04:00:00
+RandomizedDelaySec=1h          # fleet de-sync, like update_jitter_s
+Persistent=true
+[Install]
+WantedBy=timers.target
+```
+
+`systemctl enable --now matador-update.timer`. The miner service itself stays running;
+the timer unit swaps the binary on disk, and the running miner picks it up on its next
+restart (or run the timer's `ExecStart` against the live binary path and let its re-exec
+hand off in place).
 
 For solo mode, either point `rpccookiefile` at a readable cookie or run the service as a user that can read the local `btxd` datadir cookie.
 
