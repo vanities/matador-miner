@@ -324,6 +324,117 @@ docker compose exec btx-miner btx-cli -datadir=/data -rpcwallet=miner getbalance
 cat ./btx-data/miner-address.txt                                                  # your reward address
 ```
 
+## Local status API
+
+`matador-miner` exposes a small **read-only HTTP API** for dashboards, watchdogs, and fleet
+hubs. It binds to `127.0.0.1` by default; keep it loopback-only unless a LAN firewall is
+intentionally protecting it. It never exposes RPC credentials or pool passwords.
+
+```bash
+matador-miner --config /etc/matador-miner/config.json --api --api-port 4060
+# or in matador.json: "api": { "enabled": true, "listen": "127.0.0.1", "port": 4060 }
+```
+
+For multi-GPU rigs (`gpus: [0, 1, 2]`), each child process gets its own port incremented from
+the base: `4060`, `4061`, `4062`, ...
+
+### `GET /health`
+
+Liveness probe. Always cheap, no GPU work.
+
+```console
+$ curl -s http://127.0.0.1:4060/health
+{"status":"ok"}
+```
+
+### `GET /summary` (also served at `/`)
+
+Full runtime snapshot: counters, backend, worker, chain, public payout address, watchdog
+state, GPU telemetry, and auto-update status.
+
+```console
+$ curl -s http://127.0.0.1:4060/summary | python3 -m json.tool
+{
+    "status": "ok",
+    "version": "0.4.4",
+    "mode": "solo",
+    "backend": "cuda",
+    "uptime_sec": 8123,
+    "worker": "rig1",
+    "chain": "main",
+    "payoutaddress": "btx1z...",
+    "shares": { "accepted": 142, "rejected": 0, "stale": 1, "dev": 2 },
+    "nonces": {
+        "total": 184320000,
+        "batched_attempts": 184320000,
+        "batched_digest_requests": 1440000,
+        "batch_size": 128,
+        "async_prepare": true,
+        "overlapped_prepares": 1437,
+        "prefetched_batches": 2
+    },
+    "watchdog": {
+        "status": "ok",
+        "last_warning": "",
+        "last_action": "",
+        "reject_streak": 0,
+        "last_notify_age_sec": 4,
+        "last_share_age_sec": 12,
+        "last_accept_age_sec": 12,
+        "last_nonce_age_sec": 0,
+        "reconnect_requested": false
+    },
+    "thermal": {
+        "enabled": true,
+        "status": "ok",
+        "warn_temp_c": 86,
+        "critical_temp_c": 90,
+        "warn_power_w": 0,
+        "max_temp_c": 61,
+        "max_power_w": 575,
+        "warnings": []
+    },
+    "gpu_runtime": [
+        {
+            "gpu_uuid": "GPU-abc12345-...",
+            "vendor": "nvidia",
+            "util_pct": 99,
+            "power_w": 575,
+            "temp_c": 61
+        }
+    ],
+    "update": {
+        "current": "0.4.4",
+        "latest_seen": "0.4.4",
+        "last_check_age_sec": 612,
+        "channel": "stable",
+        "auto_update": true
+    },
+    "pools": [
+        { "index": 0, "host": "127.0.0.1", "port": 19334, "label": "local-btxd" }
+    ]
+}
+```
+
+Pull a single field, e.g. for a fleet view:
+
+```bash
+curl -s http://127.0.0.1:4060/summary | python3 -c 'import sys,json; print(json.load(sys.stdin)["update"])'
+scripts/matador-status.sh                # readable terminal dashboard over the same /summary
+```
+
+### `GET /pools`
+
+The effective, ordered failover pool list (solo points at your local `btxd`).
+
+```console
+$ curl -s http://127.0.0.1:4060/pools
+{"pools":[{"index":0,"host":"127.0.0.1","port":19334,"label":"local-btxd"}]}
+```
+
+Anything else returns `404 {"error":"not_found"}`; non-`GET` methods return
+`405 {"error":"method_not_allowed"}`.
+
 ## Fast-start / snapshot (0.32.12)
 
 The entrypoint loads an assumeutxo snapshot to skip most of the initial sync. 0.32.11 added
