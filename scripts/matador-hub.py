@@ -110,6 +110,7 @@ class Fleet:
         now = self._now_ms()
         rigs, totals = [], {
             "workers": len(self.workers), "online": 0, "offline": 0,
+            "mining": 0, "gated": 0,
             "nonce_per_s": 0.0, "power_w": 0.0, "accepted": 0, "rejected": 0,
             "stale": 0, "behind": 0,
         }
@@ -125,12 +126,15 @@ class Fleet:
                 current = upd.get("current", s.get("version", ""))
                 latest = upd.get("latest_seen", "")
                 behind = bool(latest and current and latest != current)
+                mining_state = s.get("mining_state", "mining") if st["online"] else "offline"
+                gated = st["online"] and mining_state == "gated"
                 rigs.append({
                     "label": label, "url": st["url"], "online": st["online"],
                     "last_seen_age_s": (now - st["last_ok_ms"]) // 1000 if st["last_ok_ms"] else None,
                     "version": current, "latest_seen": latest, "behind": behind,
                     "channel": upd.get("channel", ""), "auto_update": upd.get("auto_update"),
                     "mode": s.get("mode", ""), "backend": s.get("backend", ""),
+                    "mining_state": mining_state, "gate_reason": s.get("gate_reason", ""),
                     "uptime_sec": s.get("uptime_sec", 0), "nonce_per_s": round(rate),
                     "shares": shares, "thermal": (s.get("thermal", {}) or {}).get("status", ""),
                     "watchdog": (s.get("watchdog", {}) or {}).get("status", ""),
@@ -140,6 +144,10 @@ class Fleet:
                     totals["online"] += 1
                     totals["nonce_per_s"] += rate
                     totals["power_w"] += power
+                    if gated:
+                        totals["gated"] += 1
+                    else:
+                        totals["mining"] += 1
                 else:
                     totals["offline"] += 1
                 totals["accepted"] += int(shares.get("accepted", 0) or 0)
@@ -165,17 +173,26 @@ def render_html(snap):
     t = snap["totals"]
     rows = []
     for r in snap["rigs"]:
-        cls = "off" if not r["online"] else ("warn" if r["behind"] or r["thermal"] in ("warning", "critical") else "ok")
+        if not r["online"]:
+            cls, state = "off", "DOWN"
+        elif r["mining_state"] == "gated":
+            cls, state = "gated", "GATED"
+        elif r["behind"] or r["thermal"] in ("warning", "critical"):
+            cls, state = "warn", "MINING"
+        else:
+            cls, state = "ok", "MINING"
         ver = r["version"] + (f' &rarr; {r["latest_seen"]}' if r["behind"] else "")
+        # show the gate reason for gated rigs, else thermal status
+        note = r["gate_reason"] if r["mining_state"] == "gated" and r["gate_reason"] else (r["thermal"] or "-")
         sh = r["shares"]
         rows.append(
             f'<tr class="{cls}"><td>{r["label"]}</td>'
-            f'<td>{"UP" if r["online"] else "DOWN"}</td><td>{ver}</td>'
+            f'<td>{state}</td><td>{ver}</td>'
             f'<td>{r["mode"]}/{r["backend"]}</td>'
             f'<td class="num">{human_rate(r["nonce_per_s"])}</td>'
             f'<td class="num">{r["power_w"]}W</td>'
             f'<td class="num">{sh.get("accepted",0)}/{sh.get("rejected",0)}</td>'
-            f'<td>{r["thermal"] or "-"}</td><td>{r["watchdog"] or "-"}</td>'
+            f'<td>{note}</td><td>{r["watchdog"] or "-"}</td>'
             f'<td class="num">{r["uptime_sec"]}s</td></tr>')
     return f"""<!doctype html><html><head><meta charset=utf-8>
 <meta http-equiv=refresh content=5><title>matador fleet</title><style>
@@ -185,10 +202,12 @@ table{{border-collapse:collapse;width:100%;margin-top:.6rem}}
 th,td{{padding:.35rem .6rem;border-bottom:1px solid #1c2433;text-align:left}}
 th{{color:#7a88a8;font-weight:600}} .num{{text-align:right}}
 tr.off td{{color:#6b7280}} tr.warn td:first-child{{color:#f0c674}}
-tr.ok td:first-child{{color:#9ece6a}} .tot{{font-size:1.05rem;margin:.4rem 0}}
-.tot b{{color:#9ece6a}} .behind b{{color:#f0c674}}</style></head><body>
-<h1>matador fleet <span class=sub>phase 1 telemetry</span></h1>
+tr.ok td:first-child{{color:#9ece6a}} tr.gated td:first-child{{color:#7aa2f7}}
+.tot{{font-size:1.05rem;margin:.4rem 0}}
+.tot b{{color:#9ece6a}} .behind b{{color:#f0c674}} .gate b{{color:#7aa2f7}}</style></head><body>
+<h1>matador fleet <span class=sub>telemetry</span></h1>
 <div class=tot>{t['online']}/{t['workers']} online &middot;
+ <b>{t['mining']}</b> mining &middot; <span class=gate><b>{t['gated']}</b> gated</span> &middot;
  <b>{human_rate(t['nonce_per_s'])}</b> total &middot; {t['power_w']}W &middot;
  shares {t['accepted']}/{t['rejected']} (acc/rej)
  <span class=behind>&middot; <b>{t['behind']}</b> behind</span></div>
