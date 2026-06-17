@@ -1,18 +1,18 @@
-# matador-miner - a fast standalone miner for `btxchain/btx`
+# matador-miner - standalone mining for `btxchain/btx`
 
 ![MATADOR - fearless BTX MatMul miner](docs/matador.png)
 
 A **standalone, decoupled** miner for the BTX MatMul proof-of-work. It can solo-mine
 against your own `btxd` (`getblocktemplate` -> `submitblock`) or pool-mine directly
 against [minebtx](https://minebtx.com/) / dexbtx-style pools, so updating the miner never restarts your node.
-Built to be fast (CUDA async overlap is baked in) and to keep solo blocks self-custodied.
+Designed to keep solo blocks self-custodied.
 
 **Backends**
 
 | Backend | Status |
 |---------|--------|
-| NVIDIA CUDA single-GPU fat binary (`sm_80`, `sm_86`, `sm_89`, `sm_90`, `sm_120`) | working today |
-| NVIDIA multi-GPU | on the roadmap |
+| NVIDIA CUDA fat binary (`sm_80`, `sm_86`, `sm_89`, `sm_90`, `sm_120`) | working today |
+| NVIDIA multi-GPU | working today |
 | Apple Silicon (Metal) | working |
 | AMD (HIP/ROCm) | sidecar bridge to companion C++/HIP solver [`amdbtx`](https://github.com/thekillsquad007/amdbtx) |
 
@@ -20,10 +20,10 @@ Built to be fast (CUDA async overlap is baked in) and to keep solo blocks self-c
 
 | Hardware | Backend | Estimated rate | Notes |
 |----------|---------|----------------|-------|
-| NVIDIA RTX 5090 / Blackwell `sm_120` | CUDA | ~19.5k-20.5k nonce/s | Live `matador-miner` pool rate on `pc` with async overlap on. |
+| NVIDIA RTX 5090 / Blackwell `sm_120` | CUDA | ~19.5k-20.5k nonce/s | Observed release-build pool rate. |
 | Apple M4 Max | Metal | ~1.1k-1.3k nonce/s | Working macOS arm64 build; useful for dev / spare-Mac mining. |
 | Other NVIDIA CUDA GPUs | CUDA | not benchmarked here | Release binaries include Ampere/Ada/Hopper/Blackwell cubins: `sm_80`, `sm_86`, `sm_89`, `sm_90`, `sm_120`. Measure locally. |
-| Multiple NVIDIA GPUs | CUDA | not available yet | True multi-GPU scheduling is still roadmap. |
+| Multiple NVIDIA GPUs | CUDA | working | Configure the GPU list in `matador.json` or with `--gpus`. |
 
 > **AMD GPUs (Radeon / Instinct):** matador can hand HIP/ROCm solves to the companion
 > C++/HIP sidecar from [`amdbtx`](https://github.com/thekillsquad007/amdbtx). Build it with
@@ -91,7 +91,7 @@ that runs its own pinned BTX full node **and** GPU solo-mines against it, with t
 miner, and wallet all sandboxed from your host. Reach for this if you'd rather run your own
 node end-to-end than mine against an existing one.
 
-> **Upstream / official node:** [`github.com/btxchain/btx`](https://github.com/btxchain/btx). Pinned to **v0.32.12** (commit [`f3c9eb77`](https://github.com/btxchain/btx/commit/f3c9eb77fa547a48862bc9bcec5f0d6acf4f0bb8)). This repo **compiles that exact commit from source** with the CUDA MatMul backend by choice - it guarantees native codegen for the supported NVIDIA arch set (`sm_80/86/89/90/120`) and a byte-reproducible build. To run the GPG-signed prebuilt instead, set `BTX_INSTALL_MODE=release` + `RELEASE_TAG=v0.32.12` in `docker-compose.yml`.
+> **Upstream / official node:** [`github.com/btxchain/btx`](https://github.com/btxchain/btx). Pinned to **v0.32.12** (commit [`f3c9eb77`](https://github.com/btxchain/btx/commit/f3c9eb77fa547a48862bc9bcec5f0d6acf4f0bb8)). This repo **compiles that exact commit from source** with CUDA support for the bundled Docker path. To run the GPG-signed prebuilt instead, set `BTX_INSTALL_MODE=release` + `RELEASE_TAG=v0.32.12` in `docker-compose.yml`.
 >
 > **Consensus timeline (upgrade before each height or you fork off the network):** block **125,000** shielded sunset + MatMul nonce-seed **v2**; **130,000** temporary empty-block subsidy penalty; **130,500** MatMul seed-derivation **v3** (binds each nonce's seed to the parent block's `parent_mtp`); **132,000** forward consensus (shielded-exit velocity cap, empty-block penalty ends); **135,000** shielded-unshield velocity-cap quota ends (added in v0.32.12). 0.32.12 covers all of these.
 
@@ -108,10 +108,9 @@ node end-to-end than mine against an existing one.
 - **Source build:** compiles a single, pinned, immutable commit (0.32.12) from
   [`github.com/btxchain/btx`](https://github.com/btxchain/btx). The signed
   release key is integrity-only (self-published, no independent vouching), so
-  commit pinning is comparable trust - and native CUDA cubins for `sm_80/86/89/90/120`
-  avoid depending on generic PTX JIT for supported NVIDIA generations. Acceptable **only** because everything runs sandboxed here with
-  no funds at stake; do not extend trust beyond this container. Set
-  `BTX_INSTALL_MODE=release` to run the signed prebuilt instead.
+  commit pinning is comparable trust. Acceptable **only** because everything runs
+  sandboxed here with no funds at stake; do not extend trust beyond this container.
+  Set `BTX_INSTALL_MODE=release` to run the signed prebuilt instead.
 - Mines to a wallet generated **inside your mounted `./btx-data`** so the wallet
   state and keys persist outside the container.
 - Publishes the node RPC port only on host loopback (`127.0.0.1:19334`) so an
@@ -170,10 +169,8 @@ $EDITOR matador.json                          # set your payout address + worker
 ```
 
 For multi-GPU rigs, set `"gpus": [0, 1, 2]` in `matador.json` (or pass
-`--gpus 0,1,2`). This is deliberately simple: matador starts one ordinary miner
-process per GPU, scopes visible devices for each child, appends worker suffixes
-like `rig1-gpu0`, and increments API ports (`4060`, `4061`, ...). No cross-GPU
-batching or autotuning is attempted.
+`--gpus 0,1,2`). Each configured GPU reports under its own worker/API suffix so
+you can monitor cards independently.
 
 Prefer just the bare binary? Use the one-liner below instead.
 
@@ -257,45 +254,28 @@ See [`docs/config.example.nvidia.json`](docs/config.example.nvidia.json),
   `bin/btx-gbt-solve-hip`; use `--hip-solver` or config `sidecars.hip` only for custom layouts.
   If the sidecar is missing/fails, matador logs the reason and falls back to its in-process path.
   AMD telemetry can use `rocm-smi` when present.
-- Closed-source binary (AM2 LLC); **verify the sha256** before running. `LOG_LEVEL=debug`
-  for full per-stage solve timing, every template, every submit (accept/reject + reason).
+- Closed-source binary (AM2 LLC); **verify the sha256** before running. Use `LOG_LEVEL=debug`
+  when you need extra troubleshooting logs.
 
 ## Tuning
 
-**`matador-miner` self-tunes the solver internals** (input generation, batch size, prefetch
-depth, pipeline overlap) for the detected GPU, so there is very little to turn. The only knobs
-you normally touch:
+`matador-miner` chooses safe defaults for the detected hardware, so there is very little to
+turn. The normal user-facing knobs are:
 
 | Knob | Default | What it does | When to change |
 | --- | --- | --- | --- |
-| `solver_threads` | 1 | CPU feeder threads per GPU | Raise (e.g. 8) if the GPU isn't saturated; too many starves a fast card |
-| `overlap` | true | pipeline-overlap (+22.9%, byte-exact) | Leave on; set false only for a serial A/B baseline |
+| `gpus` / `--gpus` | first available GPU | GPU IDs to mine on | Set for multi-GPU rigs |
 | `backend` | cuda | `cuda` / `metal` / `cpu` / `hip`/`rocm` | Match your hardware |
 | `--dev-fee` | 1 | dev-fee % of wall-clock time | `0` disables |
 
-If instead you run the **upstream [`dexbtx-miner`](https://github.com/dexbtx/minebtx) pool
-client** (its `~/.dexbtx-miner/config.yaml`), these are the levers that actually matter, per its
-`docs/TUNING.md`:
-
-| Knob | Recommended | Notes |
-| --- | --- | --- |
-| `gpu_inputs` | **your GPU count** | It's a *count*, not a flag: `0` = CPU-gen (dead since block 125,000, gives 0-20% util), `1` = single GPU (mandatory for one card), `N` = N GPUs in the rig |
-| `solver_batch_size` | **128** | Sweet spot. 256+ degrades util; 1024 crashes the CUDA buffer pool. Bigger is a trap |
-| `solver_threads` | 8 (12-16 for slow cards / 5090) | Too many starves a fast card, too few starves a slow one |
-| `solver_prepare_workers` | 16 (~2x threads; 24 for slow cards) | Feeds the solver; under-provisioning bottlenecks prep |
-| `solver_prefetch_depth` | 8 | Universal sweet spot |
-| `nonces_per_slice` | leave huge (default ~1e11) | The real cap is the 30s/slice timeout; a low value just churns slices |
-
-**Golden rule for either:** change **one** knob at a time and confirm on the live miner, not a
-synthetic bench. Watch util/power with `nvidia-smi --query-gpu=utilization.gpu,power.draw,temperature.gpu --format=csv -l 2`
-alongside the accepted-share rate; aim for ~90%+ util. Reference points: a 3090/A6000 is GA102
-(`sm_86`), a 4090 is `sm_89`, a 5090 is `sm_120`.
+If support asks you to test a rig-specific setting, change one knob at a time and compare the
+accepted-share rate over a reasonable window.
 
 ## Why solo
 
-You run your own node + our CUDA solver, keep 100% of every block (no fee), saturate the
-GPU (~100% on a 5090), and get our +22.9% pipeline-overlap that a closed pool binary can't
-carry. The trade-off is variance: solo is an all-or-nothing block lottery.
+You run your own node, keep 100% of every block (no pool fee), and stay in control of your
+wallet and block submission path. The trade-off is variance: solo is an all-or-nothing block
+lottery.
 
 ## Operations (host-side helpers)
 
@@ -365,9 +345,8 @@ installer (see `doc/linux-release-builds.md`).
 
 ## Power use
 
-A 5090 mining full-tilt draws ~0.5 kW, roughly **$1-2/day** in electricity. For best
-nonces/watt rather than peak rate, `scripts/gpu-tune.service` locks the clock + caps power
-(~346 W at ~99% of the hashrate); install it per the comments in that file.
+Mining can draw significant power. Monitor temperature, fan behavior, and power draw with your
+vendor tools, and apply any clock or power limits conservatively for your own hardware.
 
 ## Help wanted - benchmarks & testing
 
@@ -389,7 +368,7 @@ welcome.
 
 ## Credits / thanks
 
-This repo is just packaging + tuning on top of other people's hard work. Thanks to:
+This repo builds on other people's hard work. Thanks to:
 
 - **[`btxchain/btx`](https://github.com/btxchain/btx)** - the BTX node, the MatMul
   proof-of-work, and the CUDA backend this builds and mines with. Everything here
