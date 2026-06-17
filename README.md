@@ -194,6 +194,23 @@ chmod +x "$(basename "$url")" && sudo mv "$(basename "$url")" /usr/local/bin/mat
 matador-miner --help
 ```
 
+**Auto-update (on by default).** The miner checks GitHub releases at startup and on an
+interval (30 min), and when a newer release is out it downloads the platform binary,
+verifies its sha256, atomically swaps itself, and re-exec's into it with the same PID —
+**no `btxd` restart**. This works the same however you launch it: **systemd, `nohup`,
+`tmux`, `screen`, or a foreground shell** (the re-exec replaces the process in place).
+
+> **Requirement:** the binary must sit in a path **writable by the user running it**.
+> `install.sh` installs to `~/.local/bin` when you're not root (works out of the box). If
+> you instead `sudo`-install to `/usr/local/bin` but run the miner as a normal user, the
+> self-update can't replace the file — it logs `cannot replace binary …` and keeps running
+> the old version. In that case either run from a user-owned dir (e.g. `~/.local/bin`,
+> `/opt/matador/bin` you own) or update manually.
+
+Tune or disable it with `--update-interval-s <sec>` (`0` = startup-only),
+`--update-channel prerelease`, `--min-version-age-s <sec>`, or `--no-auto-update` (check +
+notify only). See [`docs/matador-standalone-ops.md`](docs/matador-standalone-ops.md#auto-update).
+
 **Solo-mine** against a synced `btxd` (this repo's `make node`, or any `btxd` v0.32.12+ with
 RPC enabled):
 
