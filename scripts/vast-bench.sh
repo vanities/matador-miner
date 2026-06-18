@@ -98,7 +98,9 @@ retry(){ # retry a command up to 5x with backoff — tolerates flaky host networ
 }
 if [ "${BLEGACY:-0}" = "1" ]; then
   echo "BENCH_BIN legacy"
-  export BTX_CUDA_ALLOW_OLDER_GPUS=1   # lower the runtime CUDA gate sm_80 -> sm_60 (Pascal/Volta/Turing)
+  # NOTE: do NOT set BTX_CUDA_ALLOW_OLDER_GPUS here - the legacy build self-enables the
+  # older-GPU path with zero config. Set BLEGACY_ALLOW_ENV=1 to force it (e.g. testing old assets).
+  [ "${BLEGACY_ALLOW_ENV:-0}" = "1" ] && export BTX_CUDA_ALLOW_OLDER_GPUS=1
   retry curl -fsSL "$BLEGACY_URL" -o /usr/local/bin/matador-miner || { echo "BENCH_FAIL legacy-dl"; exit 0; }
   curl -fsSL "$BLEGACY_URL.sha256" -o /tmp/m.sha256 2>/dev/null && \
     ( cd /usr/local/bin && awk '{print $1"  matador-miner"}' /tmp/m.sha256 | sha256sum -c - ) || echo "BENCH_WARN sha-skip"
@@ -108,9 +110,10 @@ else
   install_main(){ curl -fsSL https://raw.githubusercontent.com/vanities/matador-miner/main/install.sh | PREFIX=/usr/local/bin bash; }
   retry install_main || { echo "BENCH_FAIL install"; exit 0; }
 fi
-# --backend cuda is REQUIRED: matador defaults to the CPU backend (0% GPU util) otherwise.
-# All our cards are NVIDIA (main + legacy builds); AMD would use --backend hip.
-matador-miner --mode pool --backend "${BBACKEND:-cuda}" --pool "$BPOOL" --worker "$BWORKER" \
+# BBACKEND=cuda (default) passes --backend cuda; BBACKEND=auto OMITS the flag to test the
+# binary's auto-detect path. (Older builds defaulted to CPU with no flag - hence the explicit default.)
+BFLAG="--backend ${BBACKEND:-cuda}"; [ "${BBACKEND:-}" = "auto" ] && BFLAG=""
+matador-miner --mode pool $BFLAG --pool "$BPOOL" --worker "$BWORKER" \
   --payoutaddress "$BPAYOUT" --api --api-port 4060 >/var/log/matador.log 2>&1 &
 MPID=$!
 echo "BENCH_START warmup=${BWARMUP}s measure=${BMEASURE}s"

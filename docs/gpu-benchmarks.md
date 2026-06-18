@@ -99,9 +99,10 @@ PoW for that architecture. All three arches landed accepted shares with 0 reject
 | Titan V | Volta `sm_70` | ~4.9k | ~154W | ~32 | 3 / 0 | VALIDATED |
 | Tesla T4 | Turing `sm_75` | ~2.2k | ~65W | ~34 | 2 / 0 | VALIDATED |
 
-**Requires `BTX_CUDA_ALLOW_OLDER_GPUS=1`** at runtime: the CUDA backend gate defaults to a
-minimum of `sm_80` (Ampere) and falls back to CPU on older cards; this env var lowers the floor
-to `sm_60`. The `-legacy` build exists only for these cards, so it should default that on.
+**No config needed.** The CUDA backend gate defaults to a minimum of `sm_80` (Ampere) and would
+fall back to CPU on older cards, but the `-legacy` build auto-enables the older-GPU path itself
+(it sets `BTX_CUDA_ALLOW_OLDER_GPUS` internally, lowering the floor to `sm_60`). Validated above
+on real Pascal/Volta/Turing with no env var set. `install.sh` auto-routes old GPUs to this build.
 
 The older `v0.4.9-legacy` asset is non-functional on this hardware (kernels run but produce 0
 nonces - missing/incomplete cubins) and is superseded by `v0.4.13`. Re-validate any legacy build

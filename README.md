@@ -45,9 +45,11 @@ matador-miner --mode pool --pool stratum+tcp://stratum.minebtx.com:3333 \
 | Apple Silicon (Metal) | working |
 | AMD (HIP/ROCm) | sidecar bridge to the companion solver in [`amdbtx`](https://github.com/thekillsquad007/amdbtx) |
 
-> Older NVIDIA cards (Pascal / Volta / Turing, e.g. GTX 10-series) are not covered by the main
-> CUDA-13 build, but an **experimental `-legacy` build** exists in the
-> [releases](https://github.com/vanities/matador-miner/releases) - unvalidated, feedback welcome.
+> Older NVIDIA cards (Pascal / Volta / Turing, e.g. GTX 10-series) need the separate
+> **`-legacy` build** (`sm_60/61/70/75`, CUDA 12.8), **validated on real hardware** - GTX 1080 Ti,
+> Titan V, Tesla T4 et al. land pool-accepted shares with 0 rejects
+> ([benchmarks](docs/gpu-benchmarks.md#legacy-gpus-pascal--volta--turing)). No config needed:
+> `install.sh` auto-routes old GPUs to the `-legacy` asset, and the build enables the older-GPU path itself.
 
 **Measured rates** - popular cards below; the **[full 42-GPU benchmark](docs/gpu-benchmarks.md)**
 covers every model. matador `--mode pool` on rented Vast.ai instances at stock power, June 2026;
