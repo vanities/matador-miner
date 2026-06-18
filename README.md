@@ -49,27 +49,30 @@ matador-miner --mode pool --pool stratum+tcp://stratum.minebtx.com:3333 \
 > CUDA-13 build, but an **experimental `-legacy` build** exists in the
 > [releases](https://github.com/vanities/matador-miner/releases) - unvalidated, feedback welcome.
 
-**Measured rates** (matador `--mode pool` on rented Vast.ai GPUs at stock power, ~60s
-steady-state window, June 2026; all NVIDIA cards 95-100% util, 0 rejects. Your numbers
-welcome - see [Help wanted](#help-wanted)):
+**Measured rates** - popular cards below; the **[full 42-GPU benchmark](docs/gpu-benchmarks.md)**
+covers every model. matador `--mode pool` on rented Vast.ai instances at stock power, June 2026;
+90-100% util, 0 rejects. Sorted by **value** = thousands of nonce/s per Vast `$/hr`.
 
-| Hardware | Backend | nonce/s | Power | nonce/s per W | Vast $/hr | k nonce/s per $/hr | Notes |
-|---|---|--:|--:|--:|--:|--:|---|
-| RTX 5090 (Blackwell `sm_120`) | CUDA | ~18.8k | ~452W | ~42 | ~0.40 | ~47 | Vast 12-vCPU host; tuned local peak ~20k. |
-| RTX 3090 (Ampere `sm_86`) | CUDA | ~5.9k | ~248W | ~24 | ~0.13 | ~45 | Best value/$: cheap rent, useful rate. |
-| RTX 4090 (Ada `sm_89`) | CUDA | ~14.6k | ~383W | ~38 | ~0.33 | ~44 | |
-| RTX 6000 Ada (`sm_89`) | CUDA | ~10.5k | ~290W | ~36 | ~0.54 | ~20 | |
-| A100 SXM4 (Ampere `sm_80`) | CUDA | ~7.1k | ~233W | ~31 | ~0.59 | ~12 | Integer/ALU PoW, no tensor cores, so it sits below the 4090. |
-| RTX 3060 (Ampere `sm_86`) | CUDA | ~1.5k | ~105W | ~14 | ~0.05 | ~29 | |
-| H100 (Hopper `sm_90`, SXM) | CUDA | ~12.5k | - | - | - | - | Community-reported; FP32 tier (~4090-class, no tensor cores), not its AI tier. |
-| Apple M4 Max | Metal | ~1.1k-1.3k | - | - | - | - | Owned; spare-Mac / dev mining. |
+| GPU | nonce/s | Power | nonce/s per W | Vast $/hr | value |
+|---|--:|--:|--:|--:|--:|
+| RTX 3070 | 4.3k | ~188W | ~23 | ~0.07 | **63.1** |
+| RTX 5070 | 6.5k | ~180W | ~36 | ~0.13 | **50.8** |
+| RTX 3080 | 5.8k | ~248W | ~23 | ~0.12 | **48.5** |
+| RTX 5090 (`sm_120`) | 18.8k | ~452W | ~42 | ~0.40 | **47.1** |
+| RTX 4070 Ti | 6.8k | ~135W | ~50 | ~0.15 | **45.8** |
+| RTX 3090 | 5.9k | ~247W | ~24 | ~0.13 | **44.5** |
+| RTX 4090 (`sm_89`) | 14.6k | ~382W | ~38 | ~0.33 | **43.7** |
+| RTX 4080 | 9.5k | ~297W | ~32 | ~0.24 | **39.4** |
+| RTX 3060 (`sm_86`) | 1.5k | ~105W | ~14 | ~0.05 | **29.2** |
+| A100 SXM4 (`sm_80`) | 7.1k | ~232W | ~31 | ~0.59 | **12.0** |
+| H100 SXM (`sm_90`) | 11.8k | ~340W | ~35 | ~2.01 | **5.9** |
+| Apple M4 Max | Metal: ~1.1k-1.3k | - | - | - | - |
 
-Sorted by **value (k nonce/s per Vast $/hr)** - the metric that matters when renting. Consumer
-cards (5090 / 3090 / 4090) beat datacenter parts (6000 Ada, A100) by ~2-4x: this PoW is
-integer/ALU work, so the AI-tier premium buys cores it can't use. Vast `$/hr` are per-offer
-snapshots from June 2026 and float with the marketplace. NVIDIA numbers collected with
-`scripts/vast-bench.sh` (rent, mine the pool, rank by nonce/watt or value). AMD was not
-measured: Vast.ai had zero AMD GPUs in inventory at the time.
+Consumer cards win on value by 2-4x: this PoW is integer/ALU work, so the AI-datacenter premium
+(A100, H100, RTX 6000) buys tensor cores it can't use. **See
+[docs/gpu-benchmarks.md](docs/gpu-benchmarks.md)** for all 32 GPUs, efficiency + throughput
+rankings, methodology, and AMD + legacy notes. Reproduce with `scripts/vast-bench.sh`. Your
+numbers welcome - see [Help wanted](#help-wanted).
 
 ## Quick start
 

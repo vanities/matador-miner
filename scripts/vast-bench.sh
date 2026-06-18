@@ -54,8 +54,10 @@ LAUNCH_TIMEOUT="${LAUNCH_TIMEOUT:-1200}"
 DRY_RUN="${DRY_RUN:-0}"
 OUT="${OUT:-bench-results/vast-$(date +%Y%m%d-%H%M%S).csv}"
 LEGACY_TAG="${LEGACY_TAG:-v0.4.9-legacy}"
-LEGACY_ASSET="matador-miner-${LEGACY_TAG}-linux-x86_64"
-LEGACY_URL="https://github.com/vanities/matador-miner/releases/download/${LEGACY_TAG}/${LEGACY_ASSET}"
+# Asset name defaults to "<tag>-linux-x86_64" (the v0.4.9-legacy scheme). For the newer
+# "<version>-legacy" naming, set LEGACY_ASSET, or just set LEGACY_URL to the full download URL.
+LEGACY_ASSET="${LEGACY_ASSET:-matador-miner-${LEGACY_TAG}-linux-x86_64}"
+LEGACY_URL="${LEGACY_URL:-https://github.com/vanities/matador-miner/releases/download/${LEGACY_TAG}/${LEGACY_ASSET}}"
 
 # default ladder: cheap -> flagship (5080 + H100 dropped per request)
 DEFAULT_GPUS=("RTX 3060" "RTX 3090" "RTX 4090" "RTX 6000Ada" "RTX 5090" "A100 SXM4")
@@ -96,6 +98,7 @@ retry(){ # retry a command up to 5x with backoff — tolerates flaky host networ
 }
 if [ "${BLEGACY:-0}" = "1" ]; then
   echo "BENCH_BIN legacy"
+  export BTX_CUDA_ALLOW_OLDER_GPUS=1   # lower the runtime CUDA gate sm_80 -> sm_60 (Pascal/Volta/Turing)
   retry curl -fsSL "$BLEGACY_URL" -o /usr/local/bin/matador-miner || { echo "BENCH_FAIL legacy-dl"; exit 0; }
   curl -fsSL "$BLEGACY_URL.sha256" -o /tmp/m.sha256 2>/dev/null && \
     ( cd /usr/local/bin && awk '{print $1"  matador-miner"}' /tmp/m.sha256 | sha256sum -c - ) || echo "BENCH_WARN sha-skip"
@@ -192,7 +195,7 @@ log "est cost ceiling ~\$$(python3 -c "print(round($est*$per_card_hr,2))") (boot
 [ "$DRY_RUN" = "1" ] && { log "DRY_RUN=1 — nothing launched."; exit 0; }
 [ ${#CREATED[@]} -eq 0 ] && die "no instances launched"
 
-echo "gpu,binary,nonce_per_s,scan_mnps,avg_watts,nonce_per_watt,avg_util_pct,avg_temp_c,accepted,rejected,dph" > "$OUT"
+echo "gpu,binary,nonce_per_s,scan_mnps,avg_watts,nonce_per_watt,avg_util_pct,avg_temp_c,accepted,rejected,dph,stale" > "$OUT"
 deadline=$(( $(date +%s) + LAUNCH_TIMEOUT ))
 declare -A DONE
 while :; do
@@ -209,7 +212,7 @@ import sys,os,re
 txt=sys.stdin.read(); gpu=os.environ["GPU"]; dph=os.environ["DPH"]
 binr="legacy" if "BENCH_BIN legacy" in txt else "main"
 # matador [stats] line: "... acc=A rej=R ... nonce/s=N scan=X.XMN/s" — take the last (steady state)
-stats=re.findall(r"acc=(\d+) rej=(\d+).*?nonce/s=(\d+).*?scan=([\d.]+)MN/s", txt)
+stats=re.findall(r"acc=(\d+) rej=(\d+) stale=(\d+).*?nonce/s=(\d+).*?scan=([\d.]+)MN/s", txt)
 pw=[];ut=[];tp=[]
 for line in re.findall(r"BENCH_PWR ([0-9.,\s]+)",txt):
     parts=[p.strip() for p in line.split(",")]
@@ -220,10 +223,13 @@ for line in re.findall(r"BENCH_PWR ([0-9.,\s]+)",txt):
     except: pass
 if not stats:
     print(f"{gpu},{binr},NO_STATS,,,,,,,,{dph}", file=sys.stderr); raise SystemExit
-acc,rej,nps,scan=stats[-1]; nps=int(nps)
+# nonce/s + scan from the PEAK line (avoids early-ramp under-reads on slow-boot hosts);
+# acc/rej/stale from the LAST line (cumulative counters -> final totals, for correctness checks)
+peak=max(stats, key=lambda t:int(t[3])); nps=int(peak[3]); scan=peak[4]
+acc,rej,stale=stats[-1][0],stats[-1][1],stats[-1][2]
 def mean(x): return sum(x)/len(x) if x else 0
 w=mean(pw); hpw=nps/w if w else 0
-print(f"{gpu},{binr},{nps},{scan},{w:.1f},{hpw:.2f},{mean(ut):.0f},{mean(tp):.0f},{acc},{rej},{dph}")
+print(f"{gpu},{binr},{nps},{scan},{w:.1f},{hpw:.2f},{mean(ut):.0f},{mean(tp):.0f},{acc},{rej},{dph},{stale}")
 ' >> "$OUT" 2>>"$OUT.err"
       vastai destroy instance "$iid" -y >/dev/null 2>&1 && log "  destroyed $iid"
       DONE[$iid]=1
