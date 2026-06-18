@@ -159,9 +159,12 @@ Full config keys and the systemd unit are in
 [nvidia](docs/config.example.nvidia.json) / [amd](docs/config.example.amd.json) /
 [mac](docs/config.example.mac.json).
 
-minebtx pool links: [minebtx.com](https://minebtx.com/) -
+Pool: **[minebtx](https://minebtx.com/)** is the default (the examples use
+`stratum+tcp://stratum.minebtx.com:3333`) -
 [live dashboard](https://pool.minebtx.com/) -
-[dexbtx/minebtx source](https://github.com/dexbtx/minebtx).
+[dexbtx/minebtx source](https://github.com/dexbtx/minebtx). Any dexbtx-style pool works too,
+e.g. [bitminerpool.xyz](https://bitminerpool.xyz/#miners) - just point `--pool` at its stratum
+endpoint.
 
 ## Run a fleet
 
