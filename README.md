@@ -145,6 +145,21 @@ chmod +x "$(basename "$url")" && sudo mv "$(basename "$url")" /usr/local/bin/mat
 matador-miner --help
 ```
 
+## macOS menu-bar app
+
+Prefer a GUI on Apple Silicon? **MatadorBar** is a one-click menu-bar front-end that supervises
+the miner for you, no terminal required.
+
+1. Download **[MatadorBar.dmg](https://github.com/vanities/matador-miner/releases/latest/download/MatadorBar.dmg)** from the latest release.
+2. Open the DMG, drag **MatadorBar** to Applications, then launch it.
+3. Click the menu-bar bolt, pick **Payout Address -> Add Address...**, paste your BTX address, and it starts mining.
+
+It is signed and notarized by Apple (no "unidentified developer" warning), bundles the Metal
+engine, and shows live status (state, rate, shares, GPU). From the menu you can switch pool or
+payout address, pause/resume mining, open your address in the block explorer to check your
+balance, and toggle open-at-login. The engine auto-updates itself, and the app keeps mining
+whenever it is open. The status glyph is green while mining, yellow when paused.
+
 ## Auto-update
 
 On by default: the miner checks GitHub releases at startup and every 30 min, and when a newer
