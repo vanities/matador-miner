@@ -14,7 +14,7 @@ miner can update or restart without ever touching `btxd`.
 # install + start mining a pool in two lines:
 curl -fsSL https://raw.githubusercontent.com/vanities/matador-miner/main/install.sh | bash
 matador-miner --mode pool --pool stratum+tcp://stratum.minebtx.com:3333 \
-  --worker rig1 --payoutaddress btx1...your-address
+  --worker rig1 --payoutaddress btx1zcf4z36asua8ylchysphgwfgyfr8267vvznth826epden7lar4fnqvy9gzv
 ```
 
 ## Why matador
@@ -29,8 +29,6 @@ matador-miner --mode pool --pool stratum+tcp://stratum.minebtx.com:3333 \
 - **Fleet-ready.** Run one coordinator (your node + a least-privilege work proxy + a telemetry
   dashboard) and point any number of disposable rigs at it. They hop on and off, share one
   wallet, and never collide.
-- **Honest, low fee.** A transparent **1%** time-based dev fee that you can turn **all the way
-  off** with `--dev-fee 0` - the only mainstream miner that lets you.
 - **Observable.** A read-only JSON status API (on by default, loopback) for dashboards,
   watchdogs, and the fleet hub.
 
@@ -47,14 +45,23 @@ matador-miner --mode pool --pool stratum+tcp://stratum.minebtx.com:3333 \
 > CUDA-13 build, but an **experimental `-legacy` build** exists in the
 > [releases](https://github.com/vanities/matador-miner/releases) - unvalidated, feedback welcome.
 
-**Measured rates** (your numbers are welcome - see [Help wanted](#help-wanted)):
+**Measured rates** (matador `--mode pool` on rented Vast.ai GPUs at stock power, ~60s
+steady-state window, June 2026; all NVIDIA cards 95-100% util, 0 rejects. Your numbers
+welcome - see [Help wanted](#help-wanted)):
 
-| Hardware | Backend | Rate | Notes |
-|---|---|---|---|
-| RTX 5090 (Blackwell `sm_120`) | CUDA | ~20k nonce/s | Release-build pool rate. |
-| H100 (Hopper `sm_90`, SXM) | CUDA | ~12.5k nonce/s | Community-reported. This PoW is integer/ALU work (no tensor cores), so the H100 runs at its FP32 tier (~4090-class); a 5090 wins per watt/dollar here. |
-| Apple M4 Max | Metal | ~1.1k-1.3k nonce/s | Spare-Mac / dev mining. |
-| Other NVIDIA (`sm_80`-`sm_120`) | CUDA | not benchmarked | Cubins ship for Ampere/Ada/Hopper/Blackwell - measure locally. |
+| Hardware | Backend | nonce/s | Power | nonce/s per W | Notes |
+|---|---|--:|--:|--:|---|
+| RTX 5090 (Blackwell `sm_120`) | CUDA | ~18.8k | ~452W | ~42 | Vast 12-vCPU host; tuned local peak ~20k. |
+| RTX 4090 (Ada `sm_89`) | CUDA | ~14.6k | ~383W | ~38 | |
+| RTX 6000 Ada (`sm_89`) | CUDA | ~10.5k | ~290W | ~36 | |
+| A100 SXM4 (Ampere `sm_80`) | CUDA | ~7.1k | ~233W | ~31 | Integer/ALU PoW, no tensor cores, so it sits below the 4090. |
+| RTX 3090 (Ampere `sm_86`) | CUDA | ~5.9k | ~248W | ~24 | |
+| RTX 3060 (Ampere `sm_86`) | CUDA | ~1.5k | ~105W | ~14 | |
+| H100 (Hopper `sm_90`, SXM) | CUDA | ~12.5k | - | - | Community-reported; FP32 tier (~4090-class, no tensor cores), not its AI tier. |
+| Apple M4 Max | Metal | ~1.1k-1.3k | - | - | Spare-Mac / dev mining. |
+
+NVIDIA numbers collected with `scripts/vast-bench.sh` (rent, mine the pool, rank by
+nonce/watt). AMD was not measured: Vast.ai had zero AMD GPUs in inventory at the time.
 
 ## Quick start
 
@@ -72,16 +79,18 @@ is needed. **AMD is the one exception: add `--backend hip`.**
 # Pool - no node required:
 matador-miner --mode pool \
   --pool stratum+tcp://stratum.minebtx.com:3333 \
-  --worker rig1 --payoutaddress btx1...your-address
+  --worker rig1 --payoutaddress btx1zcf4z36asua8ylchysphgwfgyfr8267vvznth826epden7lar4fnqvy9gzv
 
 # Solo - against your own btxd (v0.32.12+, RPC on); keep 100% of every block, no fee:
 matador-miner \
-  --payoutaddress btx1...your-address \
+  --payoutaddress btx1zcf4z36asua8ylchysphgwfgyfr8267vvznth826epden7lar4fnqvy9gzv \
   --rpccookiefile ~/.btx/.cookie          # or --rpcuser/--rpcpassword
 # solo is the default mode; add --rpcconnect/--rpcport if btxd isn't on 127.0.0.1:19334
 ```
 
-You should see a `nonce/s` / `scan=...MN/s` heartbeat within seconds. That's it.
+You should see a `nonce/s` / `scan=...MN/s` heartbeat within seconds. That's it. The examples
+use the project's payout address so they run as-is - **set `--payoutaddress` to your own
+`btx1...` to mine to yourself.**
 
 **Prefer a config file?** Copy the template for your GPU and just run it:
 
@@ -144,7 +153,6 @@ Tune or disable: `--update-interval-s <sec>` (`0` = startup-only), `--update-cha
 | `gpus` / `--gpus 0,1,2` | first GPU | multi-GPU fan-out; each card gets its own worker suffix + API port |
 | `backend` / `--backend` | auto | `cuda` / `metal` / `hip` / `rocm` / `cpu` - only AMD needs it set |
 | `pools` / `--pool` | - | one endpoint or an ordered failover list (pool mode) |
-| `--dev-fee` | 1 | dev-fee % of wall-clock time; `0` disables |
 
 Full config keys and the systemd unit are in
 [`docs/matador-standalone-ops.md`](docs/matador-standalone-ops.md). Example configs:
@@ -205,20 +213,18 @@ or point `--hip-solver` / config `sidecars.hip` at your own. The bundled sidecar
 on ROCm 6.x, build it yourself from amdbtx. If the sidecar is missing or fails, matador logs why
 and falls back to its in-process path.
 
-## Dev fee
+## Reliability
 
-A transparent **1%** fee: like Claymore / PhoenixMiner / T-Rex, the coinbase points at the dev
-address for ~1% of wall-clock time (~36s/hr), and matador **logs every entry and exit** of that
-window. Unlike those miners, you can turn it **completely off** with `--dev-fee 0`. In solo mode
-it's a coinbase-output swap; in pool mode it's a second authorized session for that slice. Pool
-mode also supports ordered failover, a reject-streak watchdog, and a warning-only thermal monitor
-(it never changes clocks, fans, or power limits).
+Pool mode supports ordered `pools[]` failover, a reject-streak watchdog that triggers a safe
+reconnect, optional pool-fallback for solo workers, and a warning-only thermal monitor (it never
+changes clocks, fans, or power limits). A 1% time-based dev fee funds development - the coinbase
+pays the dev address for ~36s of each hour, logged on entry and exit.
 
 ## Trust & self-custody
 
 - **Self-custody.** Solo submits to *your* `btxd` over localhost RPC and holds **no wallet keys**;
   rewards pay the `--payoutaddress` you provide.
-- **Closed-source binary** (AM2 LLC). **Verify the sha256** of every download before running it
+- **Closed-source binary.** **Verify the sha256** of every download before running it
   (the bundle and one-liner do this for you). Use `LOG_LEVEL=debug` for troubleshooting.
 - **Loopback by default.** The status API binds `127.0.0.1`; only expose it on a LAN/VPN you
   control.
@@ -243,6 +249,8 @@ snapshot - open an issue with it + your OS/driver, or PR a row into the rates ta
   and the CUDA backend this builds and mines with.
 - **[`dexbtx/minebtx`](https://github.com/dexbtx/minebtx)** (shib) - the minebtx pool and stratum
   orchestrator; the protocol reference for the v2/v3 seed + `parent_mtp` handling.
+- **[`thekillsquad007/amdbtx`](https://github.com/thekillsquad007/amdbtx)** - the companion
+  C++/HIP solver (`btx-gbt-solve-hip`) matador bridges to for AMD/ROCm mining.
 
 ## License
 

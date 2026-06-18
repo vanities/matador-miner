@@ -20,3 +20,6 @@ sync-pc.sh
 .env
 .env.*
 !.env.example
+
+# local benchmark output (reproduce with scripts/vast-bench.sh)
+bench-results/
