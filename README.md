@@ -56,8 +56,8 @@ matador-miner --mode pool \
   --payoutaddress btx1...your-btx-address
 ```
 
-**Solo** - against your own synced `btxd` (this repo's `make solo`, or any `btxd` v0.32.12+ with
-RPC on); you keep 100% of every block, no pool fee:
+**Solo** - against your own synced `btxd` (any `btxd` v0.32.12+ with RPC on); you keep 100%
+of every block, no pool fee:
 
 ```bash
 matador-miner \
@@ -79,79 +79,16 @@ $EDITOR matador.json                          # set payout address + worker
 You should see `accepted` shares (pool) or a block search, with a `nonce/s` / `scan=…MN/s`
 heartbeat, within seconds. That's it.
 
-Want the full bundle layout, Apple/AMD specifics, or the self-contained Docker node? See
-[Install the prebuilt miner](#install-the-prebuilt-miner-matador-miner) and the sections below.
+Want the full bundle layout or Apple/AMD specifics? See the sections below.
 
 ---
 
-## Or: the all-in-one Docker node + miner (`make solo`)
-
-Everything above is the **standalone miner** - a single binary you point at any `btxd`. The
-rest of this README is the *other* way to use this repo: a **self-contained Docker stack**
-that runs its own pinned BTX full node **and** GPU solo-mines against it, with the node,
-miner, and wallet all sandboxed from your host. Reach for this if you'd rather run your own
-node end-to-end than mine against an existing one.
-
-> **Upstream / official node:** [`github.com/btxchain/btx`](https://github.com/btxchain/btx). Pinned to **v0.32.12** (commit [`f3c9eb77`](https://github.com/btxchain/btx/commit/f3c9eb77fa547a48862bc9bcec5f0d6acf4f0bb8)). This repo **compiles that exact commit from source** with CUDA support for the bundled Docker path. To run the GPG-signed prebuilt instead, set `BTX_INSTALL_MODE=release` + `RELEASE_TAG=v0.32.12` in `docker-compose.yml`.
->
-> **Consensus timeline (upgrade before each height or you fork off the network):** block **125,000** shielded sunset + MatMul nonce-seed **v2**; **130,000** temporary empty-block subsidy penalty; **130,500** MatMul seed-derivation **v3** (binds each nonce's seed to the parent block's `parent_mtp`); **132,000** forward consensus (shielded-exit velocity cap, empty-block penalty ends); **135,000** shielded-unshield velocity-cap quota ends (added in v0.32.12). 0.32.12 covers all of these.
-
-**What `make solo` does:**
-
-- Compiles `btxd` + `btx-cli` + the CUDA MatMul backend from a pinned commit (**0.32.12**) in the Docker build.
-- Runs that full node in Docker (archival, `prune=0`, so shielded-state rebuilds never fail).
-- Creates/uses a local wallet under `./btx-data`.
-- Runs a supervised GPU **solo**-mining loop on BTX's MatMul proof-of-work.
-
-## Safety model (why this is the contained way to try it)
-
-- Runs entirely in a container; the node/miner cannot see your host filesystem.
-- **Source build:** compiles a single, pinned, immutable commit (0.32.12) from
-  [`github.com/btxchain/btx`](https://github.com/btxchain/btx). The signed
-  release key is integrity-only (self-published, no independent vouching), so
-  commit pinning is comparable trust. Acceptable **only** because everything runs
-  sandboxed here with no funds at stake; do not extend trust beyond this container.
-  Set `BTX_INSTALL_MODE=release` to run the signed prebuilt instead.
-- Mines to a wallet generated **inside your mounted `./btx-data`** so the wallet
-  state and keys persist outside the container.
-- Publishes the node RPC port only on host loopback (`127.0.0.1:19334`) so an
-  external miner can reach it via localhost or an SSH tunnel; cookie auth is still
-  required and nothing is exposed to the LAN/internet.
-
-## Prerequisites (on the Linux box with the GPU)
-
-- Docker + Docker Compose v2
-- Recent NVIDIA driver (Blackwell RTX 5090 needs a current R570+/R580+ driver)
-- `nvidia-container-toolkit` installed and configured:
-  `sudo nvidia-ctk runtime configure --runtime=docker && sudo systemctl restart docker`
-- Confirm the GPU is visible to Docker:
-  `docker run --rm --gpus all nvidia/cuda:12.8.0-runtime-ubuntu24.04 nvidia-smi`
-
-## Run
-
-```bash
-# copy this folder to the Linux box, then:
-make solo        # build (first run) + solo-mine on 0.32.12
-make help        # all targets: up/down/logs/status/balance/backup/restore/deploy/...
-```
-
-The first (cold) build **compiles btxd + the CUDA backend from source** - a one-time
-~20-40 min step, with the NVIDIA CUDA toolchain pulled into the Docker build, not your
-host. After that it syncs the chain (fast-start / assumeutxo keeps this short - see
-[Fast-start](#fast-start--snapshot-03212)), prints **your** mining address, and starts a
-supervised solo-mining loop. Rebuilds reuse Docker's layer cache **plus ccache**, so a
-`BTX_SOURCE_REF` bump recompiles only the translation units that actually changed
-(minutes, not a full rebuild).
-
 ## Install the prebuilt miner (`matador-miner`)
 
-Prefer a single binary over the Docker stack? `matador-miner` is a **standalone solo + pool
-GPU miner**: solo pulls work from **your own `btxd`** via `getblocktemplate`, solves on the
-GPU, and submits with `submitblock`; pool mode talks directly to
-[minebtx](https://minebtx.com/) / dexbtx-style stratum pools. It is **decoupled from the node**, so updating the miner never restarts
-`btxd` (no shielded-state warmup, no lost propagation standing). Linux x86-64 release
-assets are CUDA fat binaries for `sm_80`, `sm_86`, `sm_89`, `sm_90`, and `sm_120`
-(Ampere through Blackwell); macOS arm64 assets use Metal.
+The [Quick start](#quick-start-just-want-to-mine) above is all most people need. This
+section is the detailed reference: the release-bundle layout, the bare-binary one-liner,
+by-hand checksum verification, and auto-update. Linux x86-64 release assets are CUDA fat
+binaries for `sm_80`-`sm_120` (Ampere through Blackwell); macOS arm64 assets use Metal.
 
 **Quick start (release bundle — recommended).** Each release ships a per-platform
 `*-bundle.tar.gz` with the miner, GPU-specific config templates, and (on Linux) the
@@ -212,8 +149,7 @@ Tune or disable it with `--update-interval-s <sec>` (`0` = startup-only),
 `--update-channel prerelease`, `--min-version-age-s <sec>`, or `--no-auto-update` (check +
 notify only). See [`docs/matador-standalone-ops.md`](docs/matador-standalone-ops.md#auto-update).
 
-**Solo-mine** against a synced `btxd` (this repo's `make node`, or any `btxd` v0.32.12+ with
-RPC enabled):
+**Solo-mine** against a synced `btxd` (any `btxd` v0.32.12+ with RPC enabled):
 
 ```bash
 matador-miner \
@@ -224,15 +160,8 @@ matador-miner \
 #         --dev-fee 1 (default; 0 disables)  --dev-address <addr>  LOG_LEVEL=debug
 ```
 
-**Pool-mine** without running a node locally:
-
-```bash
-matador-miner \
-  --mode pool \
-  --pool stratum+tcp://stratum.minebtx.com:3333 \
-  --worker rig1 \
-  --payoutaddress btx1zcf4z36asua8ylchysphgwfgyfr8267vvznth826epden7lar4fnqvy9gzv
-```
+**Pool-mine** without running a node locally — same form as the Quick start
+(`--mode pool --pool stratum+tcp://stratum.minebtx.com:3333 --worker rig1 --payoutaddress btx1...`).
 
 Useful minebtx links:
 
@@ -313,36 +242,6 @@ accepted-share rate over a reasonable window.
 You run your own node, keep 100% of every block (no pool fee), and stay in control of your
 wallet and block submission path. The trade-off is variance: solo is an all-or-nothing block
 lottery.
-
-## Operations (host-side helpers)
-
-Optional but recommended for an unattended rig. Run them detached on the Linux box:
-
-```bash
-# from your clone on the Linux box:
-mkdir -p ops-logs
-nohup bash scripts/empty-block-keeper.sh >> ops-logs/empty-block-keeper.log 2>&1 </dev/null & disown
-nohup bash scripts/mining-watchdog.sh    >> ops-logs/mining-watchdog.log    2>&1 </dev/null & disown
-```
-
-- **`scripts/empty-block-keeper.sh`** - between heights 130,000 and 132,000 a coinbase-only
-  block pays **half** the subsidy. The keeper holds a tiny self-spend in the mempool so your
-  blocks stay `nTx>=2` (full subsidy). Self-exits at 132,000.
-- **`scripts/mining-watchdog.sh`** - samples the solve counter / tip / peers; on a stall it
-  alerts (`ops-logs/ALERT.txt`, optional push via `ALERT_CMD`) and auto-restarts the miner,
-  escalating to CRITICAL if a restart can't fix it (as a consensus stall wouldn't).
-- **`make deploy`** - minimal-downtime version bump: builds the new image while the miner
-  keeps mining, swaps on success, and times the warmup gap. See `docs/minimal-downtime-deploy.md`.
-
-## Monitor
-
-```bash
-make status                                                                       # sync + difficulty + live solve rate
-docker compose exec btx-miner btx-cli -datadir=/data getblockchaininfo            # sync state
-docker compose exec btx-miner btx-cli -datadir=/data getmininginfo                # difficulty, chain_guard
-docker compose exec btx-miner btx-cli -datadir=/data -rpcwallet=miner getbalance  # what you've mined
-cat ./btx-data/miner-address.txt                                                  # your reward address
-```
 
 ## Local status API
 
@@ -454,42 +353,6 @@ $ curl -s http://127.0.0.1:4060/pools
 
 Anything else returns `404 {"error":"not_found"}`; non-`GET` methods return
 `405 {"error":"method_not_allowed"}`.
-
-## Fast-start / snapshot (0.32.12)
-
-The entrypoint loads an assumeutxo snapshot to skip most of the initial sync. 0.32.11 added
-consensus pins for shielded snapshots, so the bundled fast-start snapshot loads only with
-`allowunpinnedshieldedsnapshot=1` - the entrypoint sets this automatically (idempotent, so
-existing datadirs pick it up on the next restart). `prune=0` means the node rebuilds the
-unshield-velocity state locally after loading, so forcing the load is safe.
-
-## Stop / clean up
-
-```bash
-docker compose down        # stop
-rm -rf ./btx-data          # delete chain data + wallet (back it up first if you mined anything)
-```
-
-## Manual fallback (if the automated path hiccups)
-
-The compiled binaries live at `/opt/btx/bin` (already on `PATH` in the image),
-so you can drive them by hand:
-
-```bash
-docker compose run --rm --entrypoint bash btx-miner
-# inside the container:
-BTX_MATMUL_BACKEND=cuda btxd -datadir=/data -server=1 -daemon
-btx-cli -datadir=/data createwallet miner
-btx-cli -datadir=/data -rpcwallet=miner getnewaddress
-/opt/btx-src/contrib/mining/start-live-mining.sh \
-  --datadir=/data --wallet=miner \
-  --address-file=/data/miner-address.txt --should-mine-command=/bin/true
-```
-
-To build a different commit, change `BTX_SOURCE_REF` in `docker-compose.yml`.
-To run the signed precompiled release instead, set `BTX_INSTALL_MODE=release`
-and `RELEASE_TAG=v0.32.12`; the entrypoint then runs the upstream `faststart`
-installer (see `doc/linux-release-builds.md`).
 
 ## Power use
 

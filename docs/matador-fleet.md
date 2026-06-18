@@ -39,8 +39,8 @@ with no SSH tunnels. (No VPN? See "viewing without a VPN" at the end.)
 **0. One VPN, once.** Install the VPN on the laptop, the coordinator, and every rig so they
 share a private subnet (say `100.x.y.z`). Everything below binds to that, never to public.
 
-**1. Coordinator** (one box with a synced `btxd` - this repo's `make solo`, or any
-`btxd` v0.32.12+). Pick a fleet token once, then bring up the proxy + dashboard:
+**1. Coordinator** (one box with a synced `btxd` v0.32.12+ with RPC enabled). Pick a fleet
+token once, then bring up the proxy + dashboard:
 
 ```bash
 export FLEET_TOKEN="$(head -c 24 /dev/urandom | base64)"; echo "token: $FLEET_TOKEN"
@@ -96,8 +96,7 @@ are a backstop if two ever collide).
 
 ## Coordinator setup
 
-You need a synced `btxd` (this repo's `make node`/`make solo`, or any `btxd` v0.32.12+ with
-RPC enabled) and the proxy. The proxy authenticates workers by a shared **fleet token**
+You need a synced `btxd` (any `btxd` v0.32.12+ with RPC enabled) and the proxy. The proxy authenticates workers by a shared **fleet token**
 (presented as the basic-auth password) and talks to `btxd` with its cookie:
 
 ```bash

@@ -25,7 +25,6 @@ python3 - <<'PY'
 import json
 from pathlib import Path
 expected_backends = {
-    'docs/matador-config.example.json': 'cuda',
     'docs/config.example.nvidia.json': 'cuda',
     'docs/config.example.amd.json': 'hip',
     'docs/config.example.mac.json': 'metal',
