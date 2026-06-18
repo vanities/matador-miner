@@ -42,8 +42,8 @@ for path, backend in expected_backends.items():
     assert data['gpus'] == [0], f"{p}: expected editable single-GPU default"
     assert data['payoutaddress'] == example_payout, f"{p}: expected shared example payout address"
     assert isinstance(data['pools'], list) and data['pools'], f'{p}: pools must be a non-empty list'
-    assert data['pools'][0].get('label') == 'shibs-minebtx', f'{p}: first pool should be shibs-minebtx'
-    assert data['pools'][0].get('url') == shibs_pool_url, f'{p}: first pool should be shib minebtx stratum'
+    assert data['pools'][0].get('label') == 'minebtx', f'{p}: first pool should be labeled minebtx'
+    assert data['pools'][0].get('url') == shibs_pool_url, f'{p}: first pool should be the minebtx stratum'
     for i, pool in enumerate(data['pools']):
         assert isinstance(pool, (str, dict)), f'{p}: pools[{i}] must be string or object'
         if isinstance(pool, dict):
