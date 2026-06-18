@@ -3,6 +3,9 @@
 Full results of benchmarking matador-miner across rented GPUs. The main
 [README](../README.md#measured-rates) shows a curated subset; this is the complete list.
 
+> Want to sort by any column? Open [`gpu-benchmarks.csv`](gpu-benchmarks.csv) - GitHub renders
+> CSV files as a sortable, searchable table (the Markdown tables below are static).
+
 **Method:** each GPU is rented on [Vast.ai](https://vast.ai), runs `matador-miner --mode pool`
 against the minebtx pool at stock power for a short steady-state window, and is then destroyed.
 Numbers are scraped from matador's own `[stats]` line (peak steady-state `nonce/s`) plus

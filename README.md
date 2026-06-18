@@ -73,8 +73,10 @@ covers every model. matador `--mode pool` on rented Vast.ai instances at stock p
 Consumer cards win on value by 2-4x: this PoW is integer/ALU work, so the AI-datacenter premium
 (A100, H100, RTX 6000) buys tensor cores it can't use. **See
 [docs/gpu-benchmarks.md](docs/gpu-benchmarks.md)** for all 42 GPUs, efficiency + throughput
-rankings, methodology, and AMD + legacy notes. Reproduce with `scripts/vast-bench.sh`. Your
-numbers welcome - see [Help wanted](#help-wanted).
+rankings, methodology, and AMD + legacy notes. To sort by any column yourself, open
+**[docs/gpu-benchmarks.csv](docs/gpu-benchmarks.csv)** (GitHub renders it as a sortable,
+searchable table). Reproduce with `scripts/vast-bench.sh`. Your numbers welcome - see
+[Help wanted](#help-wanted).
 
 ## Quick start
 
