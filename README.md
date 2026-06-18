@@ -24,8 +24,12 @@ matador-miner --mode pool --pool stratum+tcp://stratum.minebtx.com:3333 \
 - **Solo *or* pool.** Solo mines against your own `btxd` (`getblocktemplate` -> `submitblock`)
   and keeps every block self-custodied; pool mode talks stratum to minebtx/dexbtx pools for
   steady payouts. Same solver either way.
-- **Self-updating.** Checks GitHub on a schedule and atomically upgrades itself - same PID,
-  no node restart - so a fleet stays current with zero ops. Fleet-safe defaults; opt out any time.
+- **Self-updating, safely.** Checks GitHub on a schedule and atomically upgrades itself - same
+  PID, no node restart - so a fleet stays current with zero ops. Every update is **sha256-verified
+  before it's swapped in**: a corrupt or tampered download is refused and the miner just keeps
+  running the version it's on. A **bake-time** delay means it won't jump onto a brand-new release
+  until it has aged, so a bad release is caught (on a canary) before the fleet adopts it. Stable
+  channel only, by default; opt out any time.
 - **Fleet-ready.** Run one coordinator (your node + a least-privilege work proxy + a telemetry
   dashboard) and point any number of disposable rigs at it. They hop on and off, share one
   wallet, and never collide.
@@ -49,19 +53,23 @@ matador-miner --mode pool --pool stratum+tcp://stratum.minebtx.com:3333 \
 steady-state window, June 2026; all NVIDIA cards 95-100% util, 0 rejects. Your numbers
 welcome - see [Help wanted](#help-wanted)):
 
-| Hardware | Backend | nonce/s | Power | nonce/s per W | Notes |
-|---|---|--:|--:|--:|---|
-| RTX 5090 (Blackwell `sm_120`) | CUDA | ~18.8k | ~452W | ~42 | Vast 12-vCPU host; tuned local peak ~20k. |
-| RTX 4090 (Ada `sm_89`) | CUDA | ~14.6k | ~383W | ~38 | |
-| RTX 6000 Ada (`sm_89`) | CUDA | ~10.5k | ~290W | ~36 | |
-| A100 SXM4 (Ampere `sm_80`) | CUDA | ~7.1k | ~233W | ~31 | Integer/ALU PoW, no tensor cores, so it sits below the 4090. |
-| RTX 3090 (Ampere `sm_86`) | CUDA | ~5.9k | ~248W | ~24 | |
-| RTX 3060 (Ampere `sm_86`) | CUDA | ~1.5k | ~105W | ~14 | |
-| H100 (Hopper `sm_90`, SXM) | CUDA | ~12.5k | - | - | Community-reported; FP32 tier (~4090-class, no tensor cores), not its AI tier. |
-| Apple M4 Max | Metal | ~1.1k-1.3k | - | - | Spare-Mac / dev mining. |
+| Hardware | Backend | nonce/s | Power | nonce/s per W | Vast $/hr | k nonce/s per $/hr | Notes |
+|---|---|--:|--:|--:|--:|--:|---|
+| RTX 5090 (Blackwell `sm_120`) | CUDA | ~18.8k | ~452W | ~42 | ~0.40 | ~47 | Vast 12-vCPU host; tuned local peak ~20k. |
+| RTX 3090 (Ampere `sm_86`) | CUDA | ~5.9k | ~248W | ~24 | ~0.13 | ~45 | Best value/$: cheap rent, useful rate. |
+| RTX 4090 (Ada `sm_89`) | CUDA | ~14.6k | ~383W | ~38 | ~0.33 | ~44 | |
+| RTX 6000 Ada (`sm_89`) | CUDA | ~10.5k | ~290W | ~36 | ~0.54 | ~20 | |
+| A100 SXM4 (Ampere `sm_80`) | CUDA | ~7.1k | ~233W | ~31 | ~0.59 | ~12 | Integer/ALU PoW, no tensor cores, so it sits below the 4090. |
+| RTX 3060 (Ampere `sm_86`) | CUDA | ~1.5k | ~105W | ~14 | ~0.05 | ~29 | |
+| H100 (Hopper `sm_90`, SXM) | CUDA | ~12.5k | - | - | - | - | Community-reported; FP32 tier (~4090-class, no tensor cores), not its AI tier. |
+| Apple M4 Max | Metal | ~1.1k-1.3k | - | - | - | - | Owned; spare-Mac / dev mining. |
 
-NVIDIA numbers collected with `scripts/vast-bench.sh` (rent, mine the pool, rank by
-nonce/watt). AMD was not measured: Vast.ai had zero AMD GPUs in inventory at the time.
+Sorted by **value (k nonce/s per Vast $/hr)** - the metric that matters when renting. Consumer
+cards (5090 / 3090 / 4090) beat datacenter parts (6000 Ada, A100) by ~2-4x: this PoW is
+integer/ALU work, so the AI-tier premium buys cores it can't use. Vast `$/hr` are per-offer
+snapshots from June 2026 and float with the marketplace. NVIDIA numbers collected with
+`scripts/vast-bench.sh` (rent, mine the pool, rank by nonce/watt or value). AMD was not
+measured: Vast.ai had zero AMD GPUs in inventory at the time.
 
 ## Quick start
 
@@ -71,6 +79,9 @@ nonce/watt). AMD was not measured: Vast.ai had zero AMD GPUs in inventory at the
 ```bash
 curl -fsSL https://raw.githubusercontent.com/vanities/matador-miner/main/install.sh | bash
 ```
+
+This puts `matador-miner` on your `PATH`, so you run it as `matador-miner` from anywhere - no
+`./`. (The `./bin/matador-miner` form further down is only for the un-extracted release bundle.)
 
 **2. Mine.** The backend **auto-detects** (CUDA on NVIDIA, Metal on Apple Silicon), so no flag
 is needed. **AMD is the one exception: add `--backend hip`.**
