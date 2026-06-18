@@ -15,3 +15,8 @@ docker-compose.override.yml
 
 # personal deploy tooling (has the pc path) — keep local
 sync-pc.sh
+
+# secrets — API keys (Vast, etc.) — NEVER commit
+.env
+.env.*
+!.env.example
