@@ -1,7 +1,6 @@
 # Isolated BTX GPU solo-miner — COMPILES btxchain/btx from source.
 #
-# Pinned to the v0.32.12 tag commit, compiled WITH the CUDA MatMul backend PLUS
-# our v3 pipeline-overlap patch (+22.9% live; patches-overlap/, src/pow.cpp only).
+# Pinned to the v0.32.12 tag commit, compiled WITH the CUDA MatMul backend.
 # Upstream ships GPG-signed cuda13 prebuilts for tagged releases, but we compile
 # by choice: it guarantees native sm_120 codegen for the RTX 5090 (the prebuilt's
 # embedded archs are unverified) and yields a byte-reproducible build from an
@@ -67,23 +66,6 @@ RUN git init -q \
  && git fetch --depth 1 origin "${BTX_SOURCE_REF}" \
  && git checkout -q FETCH_HEAD
 
-# v3 pipeline-overlap patch (src/pow.cpp ONLY). NOT upstreamed — it is the source
-# of the validated +22.9% live throughput, so it is applied BY DEFAULT. Pure
-# scheduling: PoW math, seed derivation and parent_mtp handling are untouched, and
-# the overlap stays gated at RUNTIME behind BTX_MATMUL_PIPELINE_ASYNC (compose
-# defaults it to 1; set 0 for a byte-exact serial A/B without rebuilding). If the
-# patch ever fails to apply against a future BTX_SOURCE_REF the build fails LOUDLY
-# here — re-derive it then. Disable with --build-arg APPLY_OVERLAP_PATCH=0 (stock
-# solver). The patch is PUBLIC (btxchain/btx PR #72, src/pow.cpp only) so it is
-# TRACKED at node/patches/ — a plain checkout builds this image with no private/
-# dir needed. (The closed-source standalone miner stays in private/; only this
-# btxd scheduling patch is shipped in the tree.)
-ARG APPLY_OVERLAP_PATCH=1
-COPY node/patches/ /opt/btx-overlap/
-RUN if [ "${APPLY_OVERLAP_PATCH}" = "1" ]; then \
-      echo "applying v3 pipeline-overlap patch (+22.9% live; src/pow.cpp only)"; \
-      git apply --verbose /opt/btx-overlap/v3-pipeline-overlap.patch; \
-    else echo "APPLY_OVERLAP_PATCH=0 - building stock serial v3 solver (no overlap)"; fi
 
 # Configure with the CUDA MatMul backend (see upstream doc/build-unix.md):
 #   - node + cli + wallet(sqlite). BUILD_UTIL=ON only because the btx-matmul-*

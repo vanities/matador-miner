@@ -3,7 +3,7 @@
 #
 # A Docker build context that ships in a fresh clone contains EXACTLY the
 # git-tracked files. If a Dockerfile COPY/ADDs a path that is gitignored or
-# untracked (e.g. the old `COPY private/matador-miner/patches-overlap/`), the
+# untracked (e.g. `COPY private/<something>` or a gitignored dir), the
 # build works on the author's machine but fails for anyone who clones the repo:
 #   failed to compute cache key: "/private/...": not found
 #

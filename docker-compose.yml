@@ -43,12 +43,7 @@ services:
       # = ~60min. (Bumped from the old 300/10min, which was too tight for the v3
       # double-rebuild and caused a restart loop on 2026-06-15.)
       BTX_RPC_STARTUP_ATTEMPTS: ${BTX_RPC_STARTUP_ATTEMPTS:-1800}
-      # --- v3 solver pipeline-overlap knobs --------------------------------
-      # The overlap patch (node/patches/v3-pipeline-overlap.patch) is COMPILED INTO btx-miner:local
-      # by the Dockerfile, and async defaults to 1 so plain `make solo`/`make up`
-      # run the validated +22.9% overlap. It is BYTE-EXACT vs serial (same found
-      # nonces+digests), so on-by-default is safe. Set BTX_MATMUL_PIPELINE_ASYNC=0
-      # for a serial A/B baseline (no rebuild needed); the rest tune the overlap.
+      # --- matmul solver tuning knobs (passthrough to the backend) ---------
       BTX_MATMUL_PIPELINE_ASYNC: ${BTX_MATMUL_PIPELINE_ASYNC:-1}
       BTX_MATMUL_PREPARE_PREFETCH_DEPTH: ${BTX_MATMUL_PREPARE_PREFETCH_DEPTH:-}
       BTX_MATMUL_PREPARE_WORKERS: ${BTX_MATMUL_PREPARE_WORKERS:-}
