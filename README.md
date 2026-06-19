@@ -41,15 +41,15 @@ matador-miner --mode pool --pool stratum+tcp://stratum.minebtx.com:3333 \
 | Backend | Status |
 |---|---|
 | NVIDIA CUDA - fat binary (`sm_80` / `86` / `89` / `90` / `120`, Ampere -> Blackwell) | working |
+| NVIDIA CUDA - `-legacy` build (`sm_60` / `61` / `70` / `75`, Pascal -> Turing) | working - validated on GTX 1080 Ti, Titan V, Tesla T4 (0 rejects) |
 | NVIDIA multi-GPU | working |
 | Apple Silicon (Metal) | working |
 | AMD (HIP/ROCm) | sidecar bridge to the companion solver in [`amdbtx`](https://github.com/thekillsquad007/amdbtx) |
 
-> Older NVIDIA cards (Pascal / Volta / Turing, e.g. GTX 10-series) need the separate
-> **`-legacy` build** (`sm_60/61/70/75`, CUDA 12.8), **validated on real hardware** - GTX 1080 Ti,
-> Titan V, Tesla T4 et al. land pool-accepted shares with 0 rejects
-> ([benchmarks](docs/gpu-benchmarks.md#legacy-gpus-pascal--volta--turing)). No config needed:
-> `install.sh` auto-routes old GPUs to the `-legacy` asset, and the build enables the older-GPU path itself.
+> The **`-legacy` build** covers older NVIDIA cards (Pascal / Volta / Turing, e.g. GTX 10-series)
+> and links CUDA 12.8 ([benchmarks](docs/gpu-benchmarks.md#legacy-gpus-pascal--volta--turing)). No
+> config needed: `install.sh` auto-routes old GPUs to the `-legacy` asset, and the build enables the
+> older-GPU path itself.
 
 **Measured rates** - popular cards below; the **[full 42-GPU benchmark](docs/gpu-benchmarks.md)**
 covers every model. matador `--mode pool` on rented Vast.ai instances at stock power, June 2026;
@@ -69,6 +69,12 @@ covers every model. matador `--mode pool` on rented Vast.ai instances at stock p
 | RTX 3070 | 4.3k | ~188W | ~23 | ~0.07 | **63.1** |
 | RTX 3060 (`sm_86`) | 1.5k | ~105W | ~14 | ~0.05 | **29.2** |
 | Apple M4 Max | Metal: ~1.1k-1.3k | - | - | - | - |
+
+> **These rates predate v0.5.0.** They were captured on an earlier build. v0.5.0's solver wins
+> (dual-lane SHA ILP, coalesced matrix transpose, CUDA 13.2.1 toolchain) lift throughput roughly
+> **1.5x-2.0x** - the RTX 5090 now runs ~29.7k nonce/s, up from the 18.8k shown here. The gains are
+> in the shared CUDA path, so other NVIDIA cards should scale similarly; the table will be re-benched
+> on v0.5.0.
 
 Consumer cards win on value by 2-4x: this PoW is integer/ALU work, so the AI-datacenter premium
 (A100, H100, RTX 6000) buys tensor cores it can't use. **See
@@ -267,8 +273,9 @@ pays the dev address for ~36s of each hour, logged on entry and exit.
 
 ## Help wanted
 
-Only the RTX 5090 is benchmarked first-hand, and the AMD sidecar is **built but not yet validated
-on real AMD hardware** - so numbers from other gear genuinely help:
+The RTX 5090 is mined first-hand; the rest of the rates table - and the legacy GPUs - were validated
+on rented Vast.ai instances, while the AMD sidecar is **built but not yet validated on real AMD
+hardware**. So numbers from other gear, especially AMD, genuinely help:
 
 - **NVIDIA (`sm_80`-`sm_120`):** `nonce/s` + `scan=...MN/s` from the `[stats]` line, plus card +
   driver.

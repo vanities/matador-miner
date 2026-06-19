@@ -3,6 +3,12 @@
 Full results of benchmarking matador-miner across rented GPUs. The main
 [README](../README.md#measured-rates) shows a curated subset; this is the complete list.
 
+> **These numbers predate v0.5.0.** They were captured on an earlier build; v0.5.0's solver wins
+> (dual-lane SHA ILP, coalesced matrix transpose, CUDA 13.2.1 toolchain) lift throughput roughly
+> **1.5x-2.0x**. For example the RTX 5090 now runs ~29.7k nonce/s vs the 18.8k listed here. The wins
+> are in the shared CUDA path, so every NVIDIA card should scale similarly; this page (and the CSV)
+> will be re-benched on v0.5.0.
+
 > Want to sort by any column? Open [`gpu-benchmarks.csv`](gpu-benchmarks.csv) - GitHub renders
 > CSV files as a sortable, searchable table (the Markdown tables below are static).
 
