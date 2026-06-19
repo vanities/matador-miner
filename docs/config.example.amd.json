@@ -3,8 +3,10 @@
 
   "_set_these": "per-rig settings you actually edit",
   "mode": "pool",
+  "_pools_comment": "ordered failover: matador mines the first reachable pool and falls back to the next if it goes down. The 2nd entry is a backup so the rig keeps mining if the primary is unreachable. Same as repeating --pool on the CLI.",
   "pools": [
-    { "label": "minebtx", "url": "stratum+tcp://stratum.minebtx.com:3333" }
+    { "label": "minebtx", "url": "stratum+tcp://stratum.minebtx.com:3333" },
+    { "label": "bitminerpool", "url": "stratum+tcp://stratum.bitminerpool.xyz:3333" }
   ],
   "worker": "amd-rig1",
   "payoutaddress": "btx1zcf4z36asua8ylchysphgwfgyfr8267vvznth826epden7lar4fnqvy9gzv",

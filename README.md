@@ -11,9 +11,11 @@ Point it at your own node and keep 100% of every block, or pool-mine against
 miner can update or restart without ever touching `btxd`.
 
 ```bash
-# install + start mining a pool in two lines:
+# install + start mining a pool (repeat --pool for automatic failover to a backup):
 curl -fsSL https://raw.githubusercontent.com/vanities/matador-miner/main/install.sh | bash
-matador-miner --mode pool --pool stratum+tcp://stratum.minebtx.com:3333 \
+matador-miner --mode pool \
+  --pool stratum+tcp://stratum.minebtx.com:3333 \
+  --pool stratum+tcp://stratum.bitminerpool.xyz:3333 \
   --worker rig1 --payoutaddress btx1zcf4z36asua8ylchysphgwfgyfr8267vvznth826epden7lar4fnqvy9gzv
 ```
 
@@ -100,9 +102,10 @@ This puts `matador-miner` on your `PATH`, so you run it as `matador-miner` from 
 is needed. **AMD is the one exception: add `--backend hip`.**
 
 ```bash
-# Pool - no node required:
+# Pool - no node required (2nd --pool is a backup; matador fails over if the 1st is down):
 matador-miner --mode pool \
   --pool stratum+tcp://stratum.minebtx.com:3333 \
+  --pool stratum+tcp://stratum.bitminerpool.xyz:3333 \
   --worker rig1 --payoutaddress btx1zcf4z36asua8ylchysphgwfgyfr8267vvznth826epden7lar4fnqvy9gzv
 
 # Solo - against your own btxd (v0.32.12+, RPC on); keep 100% of every block, no fee:
