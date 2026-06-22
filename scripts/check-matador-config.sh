@@ -135,6 +135,8 @@ expect('hip sidecar auto-discovery present', 'ResolveHipSolverPath' in s and 'au
 expect('hip sidecar config aliases present', '"hip_solver", "hip-solver", "hip_solver_path", "hip-solver-path"' in s and 'root.exists("sidecars") && root["sidecars"].isObject()' in s)
 expect('multi-gpu config/cli present', 'std::vector<std::string> gpu_devices' in s and 'static bool ConfigGpuDevices' in s and '--gpus=<ids>' in s and 'MATADOR_GPUS' in s)
 expect('multi-gpu process fan-out present', 'static bool MaybeRunMultiGpuSupervisor' in s and 'CUDA_VISIBLE_DEVICES' in s and 'HIP_VISIBLE_DEVICES' in s and 'MATADOR_MULTI_GPU_CHILD_WORKER' in s)
+expect('auto-hive: fan-out children share base worker name', 'setenv("MATADOR_MULTI_GPU_CHILD_WORKER", cfg.worker.c_str()' in s and 'shared -> hive' in s)
+expect('auto-hive: each pinned process reports only its own GPU (nvidia-smi --id)', 'static std::string NvidiaSmiDeviceScope' in s and '" --id=" + v' in s and 'CUDA_VISIBLE_DEVICES' in s)
 expect('pool watchdog implemented safe reconnect', 'static std::thread StartPoolWatchdog' in s and 'watchdog_reconnect_requested.store(true)' in s and 'actions=reconnect/failover' in s)
 expect('thermal watchdog is observe-only', '[thermal] threshold crossed observe_only=true' in s and 'thermal_warn_temp_c' in s)
 expect('minebtx shorthand supported', 'if (s == "minebtx") s = "stratum.minebtx.com:3333"' in s)

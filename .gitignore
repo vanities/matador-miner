@@ -13,6 +13,10 @@ address.txt
 private/
 docker-compose.override.yml
 
+# agent instructions + skill (reference the secret sauce / pc workflow) — keep local
+CLAUDE.md
+.claude/skills/
+
 # personal deploy tooling (has the pc path) — keep local
 sync-pc.sh
 
@@ -23,3 +27,4 @@ sync-pc.sh
 
 # local benchmark output (reproduce with scripts/vast-bench.sh)
 bench-results/
+gpu_names_cache.json

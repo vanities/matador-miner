@@ -2,7 +2,7 @@
 # The miner itself is the standalone `matador-miner` binary — see the README.
 
 .DEFAULT_GOAL := help
-.PHONY: help check test shell-check matador-config-check matador-bundle matador-status
+.PHONY: help check test shell-check matador-config-check matador-bundle matador-status doctor
 
 help: ## List available targets
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | \
@@ -21,5 +21,8 @@ matador-bundle: ## Package dist/matador-miner plus optional sidecars into a rele
 
 matador-status: ## Read local matador-miner API summary (MATADOR_API_URL overrides)
 	@bash scripts/matador-status.sh
+
+doctor: ## Full setup dump for triaging "won't mine" reports (redacted; safe to paste)
+	@bash scripts/matador-doctor.sh
 
 test: check ## Alias for `make check`

@@ -148,7 +148,7 @@ ONSTART_EOF
 find_offer(){
   local gpu="$1"
   vastai search offers \
-    "rentable=true num_gpus=1 reliability>$MIN_RELIABILITY dph_total<$MAX_PRICE cpu_cores_effective>=$MIN_CPU gpu_name=\"$gpu\"" \
+    "rentable=true num_gpus=1 reliability>$MIN_RELIABILITY dph_total<$MAX_PRICE cpu_cores_effective>=$MIN_CPU gpu_name=\"$gpu\" ${SEARCH_EXTRA:-}" \
     --order 'dph_total' --raw --limit 80 2>/dev/null \
   | python3 -c "
 import sys,json
