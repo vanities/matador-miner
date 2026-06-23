@@ -97,22 +97,27 @@ either AMD inventory to return to Vast or a different provider (RunPod / TensorD
 
 ## Legacy GPUs (Pascal / Volta / Turing)
 
-**Status: the `v0.4.13` legacy build (`sm_60/61/70/75`, CUDA 12.8) is VALIDATED on real
+**Status: the `v0.7.1` legacy build (`sm_60/61/70/75`, CUDA 12.8) is VALIDATED on real
 hardware** (Vast, June 2026). The pool re-validates every share, so accepted shares == correct
-PoW for that architecture. All three arches landed accepted shares with 0 rejects:
+PoW for that architecture. Every arch landed accepted shares with 0 rejects at ~100% GPU util:
 
 | GPU | arch | nonce/s | Power | nonce/s per W | acc/rej | verdict |
 |---|---|--:|--:|--:|--:|---|
-| GTX 1080 Ti | Pascal `sm_61` | ~2.4k | ~158W | ~15 | 9 / 0 | VALIDATED |
-| Titan Xp | Pascal `sm_61` | ~2.3k | ~145W | ~16 | 2 / 0 | VALIDATED |
-| Titan V | Volta `sm_70` | ~4.9k | ~154W | ~32 | 3 / 0 | VALIDATED |
-| Tesla T4 | Turing `sm_75` | ~2.2k | ~65W | ~34 | 2 / 0 | VALIDATED |
+| Tesla V100 | Volta `sm_70` | ~5.5k | ~88W | ~63 | 2 / 0 | VALIDATED |
+| Tesla T4 | Turing `sm_75` | ~3.1k | ~68W | ~47 | 4 / 0 | VALIDATED |
+| Titan V | Volta `sm_70` | ~6.1k | ~151W | ~41 | 6 / 0 | VALIDATED |
+| Titan Xp | Pascal `sm_61` | ~2.7k | ~143W | ~19 | 3 / 0 | VALIDATED |
 
-**No config needed.** The CUDA backend gate defaults to a minimum of `sm_80` (Ampere) and would
-fall back to CPU on older cards, but the `-legacy` build auto-enables the older-GPU path itself
-(it sets `BTX_CUDA_ALLOW_OLDER_GPUS` internally, lowering the floor to `sm_60`). Validated above
-on real Pascal/Volta/Turing with no env var set. `install.sh` auto-routes old GPUs to this build.
+(GTX 1080 Ti and RTX 2080 Ti had no clean Vast offer at bench time; Pascal and Turing are covered
+above by the Titan Xp and Tesla T4.)
 
-The older `v0.4.9-legacy` asset is non-functional on this hardware (kernels run but produce 0
-nonces - missing/incomplete cubins) and is superseded by `v0.4.13`. Re-validate any legacy build
-with [`scripts/validate-legacy.sh`](../scripts/validate-legacy.sh) (set `LEGACY_URL` to its asset).
+**No config needed.** The CUDA backend gate defaults to a minimum of `sm_80` (Ampere) and falls
+back to CPU on older cards, but the `-legacy` build auto-enables the older-GPU path itself
+(lowering the floor to `sm_60`). Validated above on real Pascal/Volta/Turing with no env var set.
+`install.sh` auto-routes old GPUs to this build.
+
+> **Legacy builds v0.6.4 through v0.7.0 were broken:** the `-legacy` self-enable was dropped in a
+> source refactor, so the gate stayed at `sm_80`, the GPU was rejected as too old, and the miner
+> silently fell back to CPU (0 GPU nonces). **Fixed in `v0.7.1`** and validated above. The much
+> older `v0.4.9-legacy` asset is likewise non-functional. Use `v0.7.1` or later for legacy GPUs,
+> and re-validate any build with [`scripts/validate-legacy.sh`](../scripts/validate-legacy.sh).

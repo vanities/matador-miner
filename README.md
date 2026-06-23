@@ -43,7 +43,7 @@ matador-miner --mode pool \
 | Backend | Status |
 |---|---|
 | NVIDIA CUDA - fat binary (`sm_80` / `86` / `89` / `90` / `120`, Ampere -> Blackwell) | working |
-| NVIDIA CUDA - `-legacy` build (`sm_60` / `61` / `70` / `75`, Pascal -> Turing) | working - validated on GTX 1080 Ti, Titan V, Tesla T4 (0 rejects) |
+| NVIDIA CUDA - `-legacy` build (`sm_60` / `61` / `70` / `75`, Pascal -> Turing) | working (`v0.7.1`+) - validated on Tesla V100, Titan V, Tesla T4, Titan Xp (0 rejects) |
 | NVIDIA multi-GPU | working |
 | Apple Silicon (Metal) | working |
 | AMD (HIP/ROCm) | sidecar bridge to the companion solver in [`amdbtx`](https://github.com/thekillsquad007/amdbtx) |
