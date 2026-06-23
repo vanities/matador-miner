@@ -53,34 +53,31 @@ matador-miner --mode pool \
 > config needed: `install.sh` auto-routes old GPUs to the `-legacy` asset, and the build enables the
 > older-GPU path itself.
 
-**Measured rates** - popular cards below; the **[full 42-GPU benchmark](docs/gpu-benchmarks.md)**
-covers every model. matador `--mode pool` on rented Vast.ai instances at stock power, June 2026;
-90-100% util, 0 rejects. Sorted by **efficiency** (`nonce/s per W`); `value` = thousands of nonce/s per Vast `$/hr`.
+**Measured rates** - popular cards below; the **[full 39-GPU benchmark](docs/gpu-benchmarks.md)**
+covers every model. matador `--mode pool` on rented Vast.ai instances at stock power, v0.6.8, June
+2026; ~80-100% util, 0 rejects. Sorted by **efficiency** (`nonce/s per W`); `value` = thousands of nonce/s per Vast `$/hr`.
 
 | GPU | nonce/s | Power | nonce/s per W | Vast $/hr | value |
 |---|--:|--:|--:|--:|--:|
-| RTX 4070 Ti | 6.8k | ~135W | ~50 | ~0.15 | **45.8** |
-| RTX 5090 (`sm_120`) | 18.8k | ~452W | ~42 | ~0.40 | **47.1** |
-| RTX 4090 (`sm_89`) | 14.6k | ~382W | ~38 | ~0.33 | **43.7** |
-| RTX 5070 | 6.5k | ~180W | ~36 | ~0.13 | **50.8** |
-| H100 SXM (`sm_90`) | 11.8k | ~340W | ~35 | ~2.01 | **5.9** |
-| RTX 4080 | 9.5k | ~297W | ~32 | ~0.24 | **39.4** |
-| A100 SXM4 (`sm_80`) | 7.1k | ~232W | ~31 | ~0.59 | **12.0** |
-| RTX 3090 | 5.9k | ~247W | ~24 | ~0.13 | **44.5** |
-| RTX 3080 | 5.8k | ~248W | ~23 | ~0.12 | **48.5** |
-| RTX 3070 | 4.3k | ~188W | ~23 | ~0.07 | **63.1** |
-| RTX 3060 (`sm_86`) | 1.5k | ~105W | ~14 | ~0.05 | **29.2** |
+| RTX 4070 Ti | 9.3k | ~200W | ~46 | ~0.24 | **38.5** |
+| RTX 5090 (`sm_120`) | 32.3k | ~577W | ~56 | ~0.39 | **83.2** |
+| RTX 4090 (`sm_89`) | 21.6k | ~413W | ~52 | ~0.35 | **62.1** |
+| RTX 5070 | 10.6k | ~238W | ~45 | ~0.17 | **60.9** |
+| H100 SXM (`sm_90`) | 15.8k | ~383W | ~41 | ~1.92 | **8.2** |
+| RTX 4080 | 14.6k | ~291W | ~50 | ~0.34 | **43.5** |
+| A100 SXM4 (`sm_80`) | 10.9k | ~250W | ~44 | ~0.55 | **19.8** |
+| RTX 3090 | 9.1k | ~296W | ~31 | ~0.13 | **70.2** |
+| RTX 3070 | 6.2k | ~232W | ~27 | ~0.09 | **71.1** |
+| RTX 3060 (`sm_86`) | 2.2k | ~64W | ~34 | ~0.06 | **39.9** |
 | Apple M4 Max | Metal: ~1.1k-1.3k | - | - | - | - |
 
-> **These rates predate v0.5.0.** They were captured on an earlier build. v0.5.0's solver wins
-> (dual-lane SHA ILP, coalesced matrix transpose, CUDA 13.2.1 toolchain) lift throughput roughly
-> **1.5x-2.0x** - the RTX 5090 now runs ~29.7k nonce/s, up from the 18.8k shown here. The gains are
-> in the shared CUDA path, so other NVIDIA cards should scale similarly; the table will be re-benched
-> on v0.5.0.
+> **Measured on v0.6.8**, June 2026 - up roughly **1.5x-2.0x** over the earlier pre-v0.5.0 rates
+> (the RTX 5090 went from 18.8k to **32.3k nonce/s**). Each card is a single steady-state sample and
+> Vast `$/hr` float with the marketplace, so read this as a snapshot, not a leaderboard.
 
 Consumer cards win on value by 2-4x: this PoW is integer/ALU work, so the AI-datacenter premium
 (A100, H100, RTX 6000) buys tensor cores it can't use. **See
-[docs/gpu-benchmarks.md](docs/gpu-benchmarks.md)** for all 42 GPUs, efficiency + throughput
+[docs/gpu-benchmarks.md](docs/gpu-benchmarks.md)** for all 39 GPUs, efficiency + throughput
 rankings, methodology, and AMD + legacy notes. To sort by any column yourself, open
 **[docs/gpu-benchmarks.csv](docs/gpu-benchmarks.csv)** (GitHub renders it as a sortable,
 searchable table). Reproduce with `scripts/vast-bench.sh`. Your numbers welcome - see

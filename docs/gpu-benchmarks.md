@@ -3,11 +3,10 @@
 Full results of benchmarking matador-miner across rented GPUs. The main
 [README](../README.md#measured-rates) shows a curated subset; this is the complete list.
 
-> **These numbers predate v0.5.0.** They were captured on an earlier build; v0.5.0's solver wins
-> (dual-lane SHA ILP, coalesced matrix transpose, CUDA 13.2.1 toolchain) lift throughput roughly
-> **1.5x-2.0x**. For example the RTX 5090 now runs ~29.7k nonce/s vs the 18.8k listed here. The wins
-> are in the shared CUDA path, so every NVIDIA card should scale similarly; this page (and the CSV)
-> will be re-benched on v0.5.0.
+> **Measured on v0.6.8** (current stable release), June 2026. These supersede the earlier
+> pre-v0.5.0 numbers: throughput is up roughly **1.5x-2.0x** - e.g. the
+> RTX 5090 went from 18.8k to **32.3k nonce/s**. Reproduce, or pin the same build, with
+> `BVERSION=v0.6.8 ./scripts/vast-bench.sh`.
 
 > Want to sort by any column? Open [`gpu-benchmarks.csv`](gpu-benchmarks.csv) - GitHub renders
 > CSV files as a sortable, searchable table (the Markdown tables below are static).
@@ -26,55 +25,52 @@ DRY_RUN=1 ./scripts/vast-bench.sh                  # search + cost estimate only
 Sorted by **efficiency** (`nonce/s per W`) - the metric to optimize on owned hardware. The
 `value` column (thousands of nonce/s per Vast `$/hr`) is the rental angle. Only hosts with >=8
 effective vCPU are used (fewer starve the GPU and tank the rate). Vast `$/hr` are per-offer
-snapshots from June 2026 and float with the marketplace; all cards ran at 90-100% GPU util with
+snapshots from June 2026 and float with the marketplace; cards ran at ~80-100% GPU util with
 0 rejected shares.
 
-## All NVIDIA GPUs (June 2026, sorted by efficiency = nonce/s per watt)
+## All NVIDIA GPUs (v0.6.8, June 2026, sorted by efficiency = nonce/s per watt)
 
 | GPU | nonce/s | Power | nonce/s per W | Vast $/hr | value |
 |---|--:|--:|--:|--:|--:|
-| L4 | 3.6k | ~69W | ~51 | ~0.31 | **11.6** |
-| RTX PRO 6000 WS | 15.2k | ~294W | ~51 | ~1.01 | **15.0** |
-| RTX PRO 4500 | 10.0k | ~197W | ~50 | ~0.37 | **27.1** |
-| RTX 4070 Ti | 6.8k | ~135W | ~50 | ~0.15 | **45.8** |
-| RTX PRO 6000 S | 17.7k | ~360W | ~49 | ~1.00 | **17.7** |
-| RTX PRO 4000 | 6.7k | ~142W | ~46 | ~0.28 | **23.3** |
-| RTX PRO 5000 | 12.3k | ~280W | ~43 | ~0.60 | **20.4** |
-| RTX 5000 Ada | 9.9k | ~232W | ~42 | ~0.43 | **23.2** |
-| RTX 4070S | 8.4k | ~198W | ~42 | ~0.17 | **50.3** |
-| RTX 5090 | 18.8k | ~452W | ~41 | ~0.40 | **47.1** |
-| RTX 5070 Ti | 9.3k | ~223W | ~41 | ~0.19 | **48.0** |
-| L40S | 14.1k | ~345W | ~40 | ~0.60 | **23.5** |
-| RTX 5880 Ada | 10.6k | ~263W | ~40 | ~0.54 | **19.9** |
-| L40 | 11.6k | ~292W | ~39 | ~0.47 | **24.7** |
-| RTX 4080S | 9.7k | ~250W | ~38 | ~0.24 | **40.1** |
-| RTX 4090 | 14.6k | ~382W | ~38 | ~0.33 | **43.7** |
-| RTX 5060 | 3.9k | ~104W | ~37 | ~0.08 | **47.9** |
-| RTX 4070 | 5.8k | ~159W | ~36 | ~0.17 | **33.4** |
-| RTX 6000 Ada | 10.5k | ~290W | ~36 | ~0.54 | **19.7** |
-| RTX 5060 Ti | 4.7k | ~129W | ~36 | ~0.09 | **49.9** |
-| RTX 5070 | 6.5k | ~180W | ~36 | ~0.13 | **50.8** |
-| RTX 4500 Ada | 7.2k | ~208W | ~34 | ~0.22 | **32.6** |
-| H100 SXM | 11.8k | ~340W | ~34 | ~2.01 | **5.9** |
-| H200 | 11.3k | ~339W | ~33 | ~2.83 | **4.0** |
-| A10 | 4.8k | ~149W | ~32 | ~0.30 | **16.0** |
-| RTX 4080 | 9.5k | ~297W | ~31 | ~0.24 | **39.4** |
-| RTX 4060 Ti | 4.4k | ~140W | ~31 | ~0.09 | **48.6** |
-| A100 PCIE | 7.5k | ~238W | ~31 | ~0.54 | **14.0** |
-| A100 SXM4 | 7.1k | ~232W | ~30 | ~0.59 | **12.0** |
-| RTX A2000 | 1.8k | ~67W | ~26 | ~0.07 | **25.8** |
-| RTX A5000 | 5.0k | ~196W | ~25 | ~0.20 | **24.8** |
-| RTX 3080 Ti | 6.8k | ~271W | ~25 | ~0.13 | **51.1** |
-| RTX 3090 | 5.9k | ~247W | ~23 | ~0.13 | **44.5** |
-| RTX 3080 | 5.8k | ~248W | ~23 | ~0.12 | **48.5** |
-| RTX 3070 | 4.3k | ~188W | ~22 | ~0.07 | **63.1** |
-| RTX A4000 | 2.7k | ~124W | ~22 | ~0.08 | **33.9** |
-| RTX 3060 Ti | 3.4k | ~181W | ~18 | ~0.08 | **41.3** |
-| A16 | 934 | ~52W | ~17 | ~0.13 | **7.0** |
-| RTX 3090 Ti | 7.6k | ~430W | ~17 | ~0.17 | **43.7** |
-| H100 NVL | 8.3k | ~483W | ~17 | ~2.12 | **3.9** |
-| RTX 3060 | 1.5k | ~105W | ~13 | ~0.05 | **29.2** |
-| RTX 4060 | 3.3k | n/a | n/a | ~0.11 | **30.8** |
+| L4 | 5.8k | ~72W | ~81 | ~0.31 | **18.8** |
+| RTX PRO 4000 | 10.6k | ~141W | ~75 | ~0.21 | **50.0** |
+| RTX PRO 4500 | 14.6k | ~195W | ~75 | ~0.34 | **43.7** |
+| RTX PRO 6000 S | 35.1k | ~549W | ~64 | ~1.14 | **30.9** |
+| L40S | 21.4k | ~344W | ~62 | ~1.14 | **18.8** |
+| RTX PRO 6000 WS | 36.4k | ~598W | ~61 | ~0.94 | **38.8** |
+| L40 | 17.5k | ~292W | ~60 | ~0.46 | **38.3** |
+| RTX 5090 | 32.3k | ~577W | ~56 | ~0.39 | **83.2** |
+| H100 NVL | 16.2k | ~300W | ~54 | ~1.94 | **8.4** |
+| RTX 4090 | 21.6k | ~413W | ~52 | ~0.35 | **62.1** |
+| RTX 4080S | 14.4k | ~282W | ~51 | ~0.20 | **71.9** |
+| RTX 5070 Ti | 15.1k | ~298W | ~51 | ~0.16 | **93.1** |
+| RTX 4080 | 14.6k | ~291W | ~50 | ~0.34 | **43.5** |
+| RTX 4070S | 8.4k | ~173W | ~48 | ~0.14 | **61.8** |
+| RTX A4000 | 4.8k | ~99W | ~48 | ~0.08 | **63.0** |
+| RTX 5060 Ti | 7.9k | ~164W | ~48 | ~0.08 | **102.2** |
+| RTX 5060 | 6.5k | ~138W | ~47 | ~0.08 | **79.9** |
+| A10 | 7.1k | ~149W | ~47 | ~0.30 | **23.4** |
+| RTX 4070 Ti | 9.3k | ~200W | ~46 | ~0.24 | **38.5** |
+| H200 | 17.1k | ~370W | ~46 | ~2.95 | **5.8** |
+| RTX 4070 | 8.7k | ~191W | ~46 | ~0.29 | **30.3** |
+| RTX 5070 | 10.6k | ~238W | ~45 | ~0.17 | **60.9** |
+| A100 PCIE | 11.1k | ~247W | ~45 | ~0.52 | **21.2** |
+| A100 SXM4 | 10.9k | ~250W | ~44 | ~0.55 | **19.8** |
+| RTX 4060 Ti | 6.5k | ~155W | ~42 | ~0.09 | **71.7** |
+| H100 SXM | 15.8k | ~383W | ~41 | ~1.92 | **8.2** |
+| RTX A2000 | 2.8k | ~68W | ~41 | ~0.07 | **41.0** |
+| RTX PRO 5000 | 5.8k | ~142W | ~41 | ~0.54 | **10.8** |
+| RTX A5000 | 7.6k | ~200W | ~38 | ~0.16 | **46.6** |
+| RTX 3060 | 2.2k | ~64W | ~34 | ~0.06 | **39.9** |
+| RTX 3060 Ti | 4.7k | ~147W | ~32 | ~0.07 | **67.0** |
+| RTX 3090 | 9.1k | ~296W | ~31 | ~0.13 | **70.2** |
+| RTX 3070 | 6.2k | ~232W | ~27 | ~0.09 | **71.1** |
+| RTX 3090 Ti | 10.7k | ~413W | ~26 | ~0.20 | **53.4** |
+
+> **Omitted this run:** RTX 3080 and RTX 3080 Ti (only clock/power-limited Vast offers were
+> available - scan rate ~half of what the silicon should do, which would understate the cards),
+> and RTX 5000 Ada, RTX 5880 Ada, RTX 6000 Ada, RTX 4500 Ada, A16, RTX 4060 (no Vast inventory at
+> bench time). They return to the table when clean offers do.
 
 ## Apple Silicon
 
@@ -82,13 +78,16 @@ snapshots from June 2026 and float with the marketplace; all cards ran at 90-100
 |---|---|--:|
 | Apple M4 Max | Metal | ~1.1k-1.3k |
 
+> Measured live on **v0.7.0**, which mines on the **Metal GPU** (earlier macOS builds ran on the
+> CPU at a similar rate); 0 rejected shares.
+
 ## Takeaways
 
 - **Consumer cards win on value by 2-4x.** This PoW is integer/ALU work, so the
   AI-datacenter premium (A100, H100, RTX 6000) buys tensor cores it cannot use.
-- **Best value:** RTX 3070, RTX 5070, RTX 4070S.
-- **Best efficiency** (nonce/W): L4 (~52), RTX PRO 6000 WS (~51), RTX 4070 Ti (~50).
-- **Best raw throughput:** RTX 5090 (18.8k), RTX PRO 6000 S (17.7k), RTX 4090 (14.6k).
+- **Best value** (nonce/s per $/hr): RTX 5060 Ti, RTX 5070 Ti, RTX 5090.
+- **Best efficiency** (nonce/W): L4 (~81), RTX PRO 4000 (~75), RTX PRO 4500 (~75).
+- **Best raw throughput:** RTX PRO 6000 WS (36.4k), RTX PRO 6000 S (35.1k), RTX 5090 (32.3k).
 
 ## AMD
 

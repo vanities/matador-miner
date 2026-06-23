@@ -53,6 +53,9 @@ PWR_INTERVAL="${PWR_INTERVAL:-5}"
 LAUNCH_TIMEOUT="${LAUNCH_TIMEOUT:-1200}"
 DRY_RUN="${DRY_RUN:-0}"
 OUT="${OUT:-bench-results/vast-$(date +%Y%m%d-%H%M%S).csv}"
+# Pin the MAIN (Ampere+) build to a release tag for reproducible numbers. Empty = install.sh
+# default (newest release, INCLUDING prereleases). e.g. BVERSION=v0.6.8 for the stable line.
+BVERSION="${BVERSION:-}"
 LEGACY_TAG="${LEGACY_TAG:-v0.4.9-legacy}"
 # Asset name defaults to "<tag>-linux-x86_64" (the v0.4.9-legacy scheme). For the newer
 # "<version>-legacy" naming, set LEGACY_ASSET, or just set LEGACY_URL to the full download URL.
@@ -107,7 +110,7 @@ if [ "${BLEGACY:-0}" = "1" ]; then
   chmod +x /usr/local/bin/matador-miner
 else
   echo "BENCH_BIN main"
-  install_main(){ curl -fsSL https://raw.githubusercontent.com/vanities/matador-miner/main/install.sh | PREFIX=/usr/local/bin bash; }
+  install_main(){ curl -fsSL https://raw.githubusercontent.com/vanities/matador-miner/main/install.sh | PREFIX=/usr/local/bin VERSION="${BVERSION:-}" bash; }
   retry install_main || { echo "BENCH_FAIL install"; exit 0; }
 fi
 # BBACKEND=cuda (default) passes --backend cuda; BBACKEND=auto OMITS the flag to test the
@@ -185,7 +188,7 @@ for gpu in "${GPUS[@]}"; do
   worker="$label"   # same name on the pool dashboard (pool.minebtx.com) as the Vast label
   out="$(vastai create instance "$oid" --image "$img" --disk "$DISK" --label "$label" \
         --onstart-cmd "$ONSTART" \
-        --env "-e BPOOL=$POOL -e BWORKER=$worker -e BPAYOUT=$PAYOUT -e BWARMUP=$WARMUP -e BMEASURE=$MEASURE -e BPWR_INTERVAL=$PWR_INTERVAL -e BLEGACY=$leg -e BLEGACY_URL=$LEGACY_URL" \
+        --env "-e BPOOL=$POOL -e BWORKER=$worker -e BPAYOUT=$PAYOUT -e BWARMUP=$WARMUP -e BMEASURE=$MEASURE -e BPWR_INTERVAL=$PWR_INTERVAL -e BLEGACY=$leg -e BLEGACY_URL=$LEGACY_URL -e BVERSION=$BVERSION" \
         --raw 2>&1)"
   iid="$(printf '%s' "$out" | python3 -c "import sys,json;print(json.load(sys.stdin).get('new_contract',''))" 2>/dev/null)"
   [ -z "$iid" ] && { log "  create FAILED '$gpu': $out"; continue; }
