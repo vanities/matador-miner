@@ -3,10 +3,11 @@
 Full results of benchmarking matador-miner across rented GPUs. The main
 [README](../README.md#measured-rates) shows a curated subset; this is the complete list.
 
-> **Measured on v0.6.8** (current stable release), June 2026. These supersede the earlier
-> pre-v0.5.0 numbers: throughput is up roughly **1.5x-2.0x** - e.g. the
-> RTX 5090 went from 18.8k to **32.3k nonce/s**. Reproduce, or pin the same build, with
-> `BVERSION=v0.6.8 ./scripts/vast-bench.sh`.
+> **Measured on v0.6.8**, June 2026, and still current on **v0.7.1** (latest stable): the v0.7.x
+> releases left NVIDIA Ampere+ throughput unchanged (they fixed the legacy GPU build and macOS Metal),
+> so these numbers carry forward unchanged. They supersede the earlier pre-v0.5.0 numbers: throughput
+> is up roughly **1.5x-2.0x** - e.g. the RTX 5090 went from 18.8k to **32.3k nonce/s**. Reproduce with
+> `BVERSION=v0.6.8 ./scripts/vast-bench.sh` (or `v0.7.1` - same NVIDIA output).
 
 > Want to sort by any column? Open [`gpu-benchmarks.csv`](gpu-benchmarks.csv) - GitHub renders
 > CSV files as a sortable, searchable table (the Markdown tables below are static).

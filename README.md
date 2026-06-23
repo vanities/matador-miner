@@ -71,9 +71,11 @@ covers every model. matador `--mode pool` on rented Vast.ai instances at stock p
 | RTX 3060 (`sm_86`) | 2.2k | ~64W | ~34 | ~0.06 | **39.9** |
 | Apple M4 Max | Metal: ~1.1k-1.3k | - | - | - | - |
 
-> **Measured on v0.6.8**, June 2026 - up roughly **1.5x-2.0x** over the earlier pre-v0.5.0 rates
-> (the RTX 5090 went from 18.8k to **32.3k nonce/s**). Each card is a single steady-state sample and
-> Vast `$/hr` float with the marketplace, so read this as a snapshot, not a leaderboard.
+> **Measured on v0.6.8**, June 2026, and still current on **v0.7.1** - the v0.7.x releases left
+> NVIDIA Ampere+ throughput unchanged (they fixed the legacy GPU build and macOS Metal). Up roughly
+> **1.5x-2.0x** over the earlier pre-v0.5.0 rates (the RTX 5090 went from 18.8k to **32.3k nonce/s**).
+> Each card is a single steady-state sample and Vast `$/hr` float with the marketplace, so read this
+> as a snapshot, not a leaderboard.
 
 Consumer cards win on value by 2-4x: this PoW is integer/ALU work, so the AI-datacenter premium
 (A100, H100, RTX 6000) buys tensor cores it can't use. **See
