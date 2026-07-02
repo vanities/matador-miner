@@ -153,6 +153,35 @@ chmod +x "$(basename "$url")" && sudo mv "$(basename "$url")" /usr/local/bin/mat
 matador-miner --help
 ```
 
+## HiveOS
+
+Each release ships a HiveOS custom-miner package: `matador-miner-<ver>.tar.gz`. Create a
+flight sheet with miner **Custom**, click **Setup Miner Config**, and fill:
+
+| Field | Value |
+|---|---|
+| Miner name | `matador-miner` |
+| Installation URL | `https://github.com/vanities/matador-miner/releases/download/v0.8.25/matador-miner-0.8.25.tar.gz` |
+| Hash algorithm | `btx` |
+| Wallet and worker template | `%WAL%.%WORKER_NAME%` |
+| Pool URL | `stratum+tcp://stratum.minebtx.com:3333` |
+| Pass | `x` |
+| Extra config arguments | optional matador CLI flags, e.g. `--no-gpu-suffix` |
+
+Set the flight sheet wallet to your BTX address (`btx1...`). An example flight sheet JSON
+is in [docs/hiveos-flight-sheet.example.json](docs/hiveos-flight-sheet.example.json).
+
+- Mines on **all GPUs**, one pool worker per card (`rig-gpu0`, `rig-gpu1`, ...). Add
+  `--no-gpu-suffix` to report the whole rig as a single worker, or `--gpus 0,1` to pin cards.
+- The package picks the right binary per rig automatically: main (Ampere and newer) or
+  `-legacy` (Pascal / Volta / Turing).
+- Hashrate (nonce/s, shown as kH/s), per-GPU temps, and accepted/rejected shares show up on
+  the HiveOS dashboard; the JSON status API stays available on the rig at `127.0.0.1:4060`.
+- Works with both stratum and login-style pools. Solo-through-pool: use
+  `solo:%WAL%.%WORKER_NAME%` as the template where the pool supports it.
+- Under HiveOS the self-updater is off (the flight sheet owns the install). To update, point
+  the Installation URL at the newer release tar.gz and reapply the flight sheet.
+
 ## macOS menu-bar app
 
 Prefer a GUI on Apple Silicon? **MatadorBar** is a one-click menu-bar front-end that supervises
